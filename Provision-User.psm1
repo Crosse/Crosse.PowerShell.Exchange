@@ -5,7 +5,7 @@
 # $Date$
 # $Rev$
 # 
-# DESCRIPTION:  Provisions users in Exchange
+# DESCRIPTION:  Provisions users in Exchange.
 # 
 # 
 # Copyright (c) 2009,2010 Seth Wright <wrightst@jmu.edu>
@@ -24,292 +24,407 @@
 #
 ################################################################################
 
-param ( $User="",
-        $Server="localhost",
-        [switch]$Automated=$false,
-        [switch]$Mailbox=$true,
-        [string]$ExternalEmailAddress=$null,
-        [switch]$Force=$false,
-        [switch]$Verbose=$false,
-        $EmailAddresses=$null,
-        [string]$RetryableErrorsFilePath=$null,
-        [string]$DomainController=$null,
-        [System.Collections.Hashtable]$Databases=$null,
-        [switch]$Legacy=$false,
-        $inputObject=$null )
+function Provision-User {
+    [CmdletBinding(SupportsShouldProcess=$true,
+            ConfirmImpact="High")]
+
+    param ( 
+            [Parameter(Mandatory=$true,
+                ValueFromPipeline=$true)]
+            [Alias("Identity")]
+            [Alias("Name")]
+            # Specifies the user to be provisioned.
+            $User,
+
+            [Parameter(Mandatory=$false)]
+            # Whether to force-create a mailbox for a user, even if they would
+            # not normally be a candidate for a mailbox
+            [switch]
+            $Force,
+
+            [Parameter(Mandatory=$true,
+                ParameterSetName="Mailbox")]
+            [switch]
+            # User should be provisioned as a UserMailbox.
+            $Mailbox,
+
+            [Parameter(Mandatory=$true,
+                ParameterSetName="MailUser")]
+            [switch]
+            # User should be provisioned as a MailUser.
+            $MailUser,
+
+            [Parameter(Mandatory=$true,
+                ParameterSetName="MailUser")]
+            [string]
+            # The external address (targetAddress) to assign to the MailUser.
+            $ExternalEmailAddress,
+
+            [Parameter(Mandatory=$false)]
+            # Extra email addresses to add to the recipient.
+            $EmailAddresses,
+
+            [Parameter(Mandatory=$false)]
+            [switch]
+            # Whether this function is being called in an automated fashion.
+            $Automated,
+
+            [Parameter(Mandatory=$false)]
+            [string]
+            # The file in which to write out information about users who were
+            # not successfully provisioned, if the Automated parameter is
+            # specified.
+            $RetryableErrorsFilePath,
+
+            [Parameter(Mandatory=$false)]
+            $DomainController
+        )
 
 # This section executes only once, before the pipeline.
-BEGIN {
-    if ($inputObject) {
-        Write-Output $inputObject | &($MyInvocation.InvocationName)
-        break
-    }
+    BEGIN {
+        Write-Verbose "Performing initialization actions."
 
-    if ($Mailbox) {
-        $srv = Get-ExchangeServer $Server -ErrorAction SilentlyContinue
-        if ($srv -eq $null) {
-            Write-Output "ERROR: Could not find Exchange Server $Server"
-        }
-    }
-
-    if ([String]::IsNullOrEmpty($DomainController)) {
-        $DomainController = (gc Env:\LOGONSERVER).Replace('\', '')
         if ([String]::IsNullOrEmpty($DomainController)) {
-            Write-Output "ERROR:  Could not determine the local computer's logon server!"
-            return
-        }
-    }
+            $dc = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().FindDomainController().Name
 
-    if ($Verbose) {
-        Write-Host "Using Domain Controller $DomainController"
-    }
-
-    $cwd = [System.IO.Path]::GetDirectoryName(($MyInvocation.MyCommand).Definition)
-
-    $start = Get-Date
-    if ([String]::IsNullOrEmpty($RetryableErrorsFilePath) -eq $false -or 
-        [System.IO.File]::Exists($RetryableErrorsFilePath) -eq $false) {
-            $RetryableErrorsFilePath = [System.IO.Path]::Combine($(Get-Location), "provisioning_errors_$($start.Ticks).csv")
-    }
-
-    if ($Mailbox -eq $true) {
-        if ($Legacy) {
-            if ($Databases -eq $null) {
-                $Databases = & "$cwd\Get-BestDatabase.ps1" -Server $Server -Single:$false
-                if ($Databases -eq $null) {
-                    Write-Output "ERROR: Could not enumerate databases!"
-                    return
-                }
-                if ($Verbose -eq $true) {
-                    Write-Output "Found $($Databases.Count) databases."
-                }
-            }
-        }
-    } else {
-        if ([String]::IsNullOrEmpty($ExternalEmailAddress)) {
-            Write-Output "ERROR:  No ExternalEmailAddress given, and Mailbox is false"
-            return
-        }
-    }
-
-    $exitCode = 0
-} # end 'BEGIN{}'
-
-# This section executes for each object in the pipeline.
-PROCESS {
-    if ( !($_) -and !($User) ) { 
-        Write-Output "ERROR: No user given."
-        return
-    }
-
-    if ($_) { $User = $_ }
-
-    # Was a username passed to us?  If not, bail.
-    if ([String]::IsNullOrEmpty($User)) { 
-        Write-Output "USAGE:  Provision-User -User `$User"
-        return
-    }
-
-    $objUser = Get-User $User -ErrorAction SilentlyContinue
-
-    if (!($objUser)) {
-        Write-Output "$User`tis not a valid user in Active Directory."
-        if ($Automated) {
-            Out-File -NoClobber -Append -FilePath $RetryableErrorsFilePath -InputObject "$User,$start,No AD Account"
-        }
-        $exitCode += 1
-        return
-    } else { 
-        switch ($objUser.RecipientTypeDetails) {
-            'User' { break }
-            'MailUser' {
-                if (!$Mailbox) {
-                    Write-Output "$($objUser.SamAccountName)`tis already a MailUser"
-                    return
-                    break
-                }
-            }
-            'UserMailbox' {
-                if ($Mailbox) {
-                    Write-Output "$($objUser.SamAccountName)`talready has a mailbox"
-                } else {
-                    Write-Output "$($objUser.SamAccountName)`tis a Mailbox, refusing to enable as MailUser instead"
-                    $exitCode += 1
-                }
+            if ($dc -eq $null) {
+                Write-Error "Could not find a domain controller to use for the operation."
                 return
-            }
-            'DisabledUser' {
-                if ($Mailbox) {
-                    Write-Output "$($objUser.SamAccountName)`tis disabled, refusing to create mailbox"
-                    if ($Automated) {
-                        Out-File -Append -FilePath $RetryableErrorsFilePath -InputObject "$User,$start,Disabled AD Account"
-                    }
-                    $exitCode += 1
-                    return
-                }
-                break;
-            }
-            default {
-                Write-Output "$($objUser.SamAccountName)`tis a $($objUser.RecipientTypeDetails) object, refusing to provision"
-                $exitCode += 1
-                return
-            }
-        }
-    }
-
-    # Save this off because Exchange blanks it out...
-    $displayNamePrintable = $objUser.SimpleDisplayName
-
-    if ($Mailbox) {
-        # Don't auto-create mailboxes for users in the Students OU
-        if ($objUser.DistinguishedName -match 'Student' -and $Force -eq $false) {
-            Write-Output "$($User)`tis listed as a student, refusing to create mailbox"
-            if ($Automated) {
-                Out-File -Append -FilePath $RetryableErrorsFilePath -InputObject "$User,$start,Student"
-            }
-            # Don't mark this as being an error.
-            #$exitCode += 1
-            return
-        }
-
-        if ($Legacy) {
-            $candidate = $null
-            foreach ($db in $Databases.Keys) {
-                if ($candidate -eq $null) {
-                    $candidate = $db
-                } else {
-                    if ($Databases[$db] -lt $Databases[$candidate]) {
-                        $candidate = $db
-                    }
-                }
-            }
-
-            if ($Verbose) {
-                Write-Output "Assigning $($objUser.SamAccountName) to database $candidate"
-            }
-        }
-
-        # If the user is a MailUser already, remove the Exchange bits first
-        if ($objUser.RecipientTypeDetails -match 'MailUser') {
-            & "$cwd\Deprovision-User.ps1" -User $objUser.DistinguishedName -Confirm:$false -DomainController $DomainController
-            if ($LASTEXITCODE -gt 0) {
-                Write-Output "An error occurred; refusing to create mailbox."
-                if ($Automated) {
-                    Out-File -Append -FilePath $RetryableErrorsFilePath -InputObject "$User,$start,Deprovisioning Error"
-                }
-                $exitCode += 1
-                return
-            }
-        }
-
-        # Enable the mailbox
-        $Error.Clear()
-        if ($Legacy) {
-            Enable-Mailbox -Database "$($candidate)" -Identity $objUser.Identity `
-                -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
-                -ManagedFolderMailboxPolicyAllowed:$true `
-                -DomainController $DomainController -ErrorAction SilentlyContinue
-
-            # Increment the running mailbox total for the candidate database.
-            $Databases[$candidate]++
-        } else { 
-            Enable-Mailbox -Identity $objUser.Identity `
-                -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
-                -ManagedFolderMailboxPolicyAllowed:$true `
-                -DomainController $DomainController -ErrorAction SilentlyContinue
-        }
-
-        if ($Error[0] -ne $null) {
-            Write-Output $Error[0]
-            if ($Automated) {
-                Out-File -Append -FilePath $RetryableErrorsFilePath -InputObject "$User,$start,$($Error[0].ToString())"
-            }
-            $exitCode += 1
-            return
-        } 
-
-    } else {
-        # The user should be enabled as a MailUser instead of a Mailbox.
-        $Error.Clear()
-        Enable-MailUser -Identity $objUser -ExternalEmailAddress $ExternalEmailAddress `
-            -DomainController $DomainController
-
-        if ($Error[0] -ne $null) {
-            $exitCode += 1
-            Write-Output $Error[0]
-            if ($Automated) {
-                Out-File -Append -FilePath $RetryableErrorsFilePath -InputObject "$User,$start,$($Error[0].ToString())"
-            }
-            return
-        } 
-    }
-
-    # No error, so set the SimpleDisplayName now that Exchange has 
-    # helpfully removed it.
-    if ($Verbose) {
-        Write-Output "Resetting $($objUser.SamAccountName)'s SimpleDisplayName to `"$displayNamePrintable`""
-    }
-    $error.Clear()
-    Set-User $objUser -SimpleDisplayName "$($displayNamePrintable)" `
-        -DomainController $DomainController -ErrorAction SilentlyContinue
-
-    if (![String]::IsNullOrEmpty($error[0])) {
-        Write-Output $error[0]
-    }
-
-    $EmailAddresses
-    if ($EmailAddresses -eq $null) {
-        if ($Verbose) {
-            Write-Output "Not setting addresses"
-        }
-    } else {
-        if ($Verbose) {
-            Write-Output "Explicitly adding the following addresses to $($objUser.SamAccountName)'s EmailAddresses collection:"
-            $EmailAddresses
-        }
-        $error.Clear()
-        if ($Mailbox) {
-            $addrs = (Get-Mailbox -Identity $objUser.Identity).EmailAddresses
-            foreach ($addr in $addrs) { 
-                if (!$EmailAddresses.Contains($addr)) {
-                    $EmailAddresses.Add($addr)
-                }
-            }
-
-            Set-Mailbox -Identity $objUser.Identity `
-                -EmailAddressPolicyEnabled:$false `
-                -EmailAddresses $EmailAddresses `
-                -DomainController $DomainController
-            Set-Mailbox -Identity $objUser.Identity `
-                -EmailAddressPolicyEnabled:$true `
-                -DomainController $DomainController
-            if (![String]::IsNullOrEmpty($error[0])) {
-                Write-Output $error[0]
             }
         } else {
-            $addrs = (Get-MailUser -Identity $objUser.Identity).EmailAddresses
-            foreach ($addr in $addrs) { 
-                if (!$EmailAddresses.Contains($addr)) {
-                    $EmailAddresses.Add($addr)
+            $dc = $DomainController
+        }
+        Write-Verbose "Using Domain Controller $dc"
+
+        $defaultStart = Get-Date
+
+        if ($Automated -eq $true) {
+            if ([String]::IsNullOrEmpty($RetryableErrorsFilePath)) {
+                $errorsFile = [System.IO.Path]::Combine($(Get-Location), "provisioning_errors_$($defaultStart.Ticks).csv")
+            } else {
+                $errorsFile = $RetryableErrorsFilePath
+            }
+
+            Write-Verbose "Errors File:  $errorsFile"
+        }
+
+        Write-Verbose "Start time:  $defaultStart"
+
+        Write-Verbose "Initialization complete."
+    } # end 'BEGIN{}'
+
+# This section executes for each object in the pipeline.
+    PROCESS {
+        Write-Verbose "Beginning provisioning process for `"$User`""
+
+        if ([String]::IsNullOrEmpty($User)) { 
+            Write-Error "User was null."
+            return
+        }
+
+        if ($User.User -eq $null) {
+            $userName = $User
+            $start = $defaultStart
+        } else {
+            $userName = $User.User
+            $start = $User.Date
+        }
+
+        if ($EmailAddresses -eq $null) {
+            $EmailAddresses = New-Object System.Collections.ArrayList
+        }
+
+        Write-Verbose "Finding user in Active Directory"
+        $objUser = Get-User $userName -ErrorAction SilentlyContinue
+
+        if ($objUser -eq $null) {
+            Write-Error "$userName is not a valid user in Active Directory."
+            if ($Automated) {
+                Out-File -NoClobber -Append -FilePath $errorsFile -InputObject "$userName,$start,No AD Account"
+            }
+            return
+        }
+
+        $userName = $objUser.SamAccountName
+        Write-Verbose "sAmAccountName:  $userName"
+
+        # Save these off because Exchange blanks them out...
+        $displayName = $objUser.DisplayName
+        $displayNamePrintable = $objUser.SimpleDisplayName
+        Write-Verbose "displayName:  $displayName"
+        Write-Verbose "displayNamePrintable: $displayNamePrintable"
+
+        # Perform some sanity checks and save off some data before getting into the
+        # actual provisioning process.
+        Write-Verbose "$userName is a $($objUser.RecipientTypeDetails)"
+        switch ($objUser.RecipientTypeDetails) {
+            'User' { 
+                # Nothing special about the object.
+                break
+            }
+            'MailUser' {
+                if ($MailUser -eq $true) {
+                    # If the object is a MailUser, and we are trying to enable it
+                    # as a MailUser, error out.
+                    Write-Error "$userName is already a MailUser."
+                    return
+                }
+
+                # If we're "upgrading" someone, save off any extra attributes that
+                # only Exchange recipients have
+                Write-Verbose "Saving Exchange-specific attributes in order to reapply them later"
+                $recip = Get-MailUser $userName
+                $externalEmailAddress = $recip.ExternalEmailAddress
+                $legacyExchangeDn = $recip.LegacyExchangeDN
+
+                $customAttribute1  = $recip.CustomAttribute1
+                $customAttribute2  = $recip.CustomAttribute2
+                $customAttribute3  = $recip.CustomAttribute3
+                $customAttribute4  = $recip.CustomAttribute4
+                $customAttribute5  = $recip.CustomAttribute5
+                $customAttribute6  = $recip.CustomAttribute6
+                $customAttribute7  = $recip.CustomAttribute7
+                $customAttribute8  = $recip.CustomAttribute8
+                $customAttribute9  = $recip.CustomAttribute9
+                $customAttribute10 = $recip.CustomAttribute10
+                $customAttribute11 = $recip.CustomAttribute11
+                $customAttribute12 = $recip.CustomAttribute12
+                $customAttribute13 = $recip.CustomAttribute13
+                $customAttribute14 = $recip.CustomAttribute14
+                $customAttribute15 = $recip.CustomAttribute15
+
+                $currentAddrs = $recip.EmailAddresses.Clone()
+                # Save any extra addresses that aren't the same as the
+                # targetAddress.
+                foreach ($addr in $currentAddrs) {
+                    if ($addr -notmatch $recip.ExternalEmailAddress) { 
+                        $EmailAddresses.Add($addr.ToSecondary()) | Out-Null
+                    }
+                }
+
+                break
+            }
+            'UserMailbox' {
+                if ($Mailbox -eq $true) {
+                    # If the object is a UserMailbox, and we are trying to enable
+                    # it as a UserMailbox, error out.
+                    Write-Error "$userName already has a mailbox."
+                    return
+                } elseif ($MailUser -eq $true) {
+                    # If the object is a UserMailbox, and we are tryint to enable
+                    # it as a MailUser, refuse to downgrade and error out.
+                    Write-Error "$userName is a Mailbox, refusing to enable as MailUser instead"
+                    return
+                }
+                break
+            }
+            'DisabledUser' {
+                if ($Mailbox -eq $true) {
+                    Write-Error "$userName is disabled, refusing to create mailbox."
+                    if ($Automated) {
+                        Out-File -Append -FilePath $errorsFile -InputObject "$userName,$start,Disabled AD Account"
+                    }
+                    return
+                }
+                break
+            }
+            default {
+                # If the object is anything else, we don't know how to deal with
+                # it.
+                Write-Error "$userName is a $($objUser.RecipientTypeDetails) object, refusing to provision."
+                return
+            }
+        }
+
+        
+        if ($Mailbox -eq $true) {
+            Write-Verbose "DistinguishedName:  $($objUser.DistinguishedName)"
+            # Don't auto-create mailboxes for users in the Students OU
+            if ($objUser.DistinguishedName -match 'Student') {
+                Write-Debug "Force is $Force"
+                if ($Force -eq $false) {
+                    Write-Error "$userName is listed as a student, refusing to create mailbox."
+                    # User chose to cancel the operation.
+                    if ($Automated) {
+                        Out-File -Append -FilePath $errorsFile -InputObject "$userName,$start,Student"
+                    }
+                    return
+                } else {
+                    Write-Warning "$userName is listed as a student; confirmation is required in order to create a mailbox for the user."
+                    if (!$PSCmdlet.ShouldProcess($userName, "create mailbox")) {
+                        Write-Verbose "Operation cancelled."
+                        # User chose to cancel the operation.
+                        if ($Automated) {
+                            Out-File -Append -FilePath $errorsFile -InputObject "$userName,$start,Student"
+                        }
+                        return
+                    }
                 }
             }
 
-            Set-MailUser -Identity $objUser.Identity `
-                -EmailAddressPolicyEnabled:$false `
-                -EmailAddresses $EmailAddresses `
-                -DomainController $DomainController
-            Set-MailUser -Identity $objUser.Identity `
-                -EmailAddressPolicyEnabled:$true `
-                -DomainController $DomainController
+            # If the user is a MailUser already, since we're trying to enable them
+            # as a UserMailbox we need to disable them as a MailUser first.
+            if ($objUser.RecipientTypeDetails -match 'MailUser') {
+                Write-Verbose "Disabling $userName as a MailUser in order to enable it as a UserMailbox"
+                $error.Clear()
+                Deprovision-User -User $userName -Confirm:$false -DomainController $dc -Verbose $Verbose
+
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Error $error[0]
+                    if ($Automated) {
+                        Out-File -Append -FilePath $errorsFile -InputObject "$userName,$start,Deprovisioning Error"
+                    }
+                    return
+                }
+            }
+
+            # Enable the mailbox
+            Write-Verbose "Enabling $userName as a UserMailbox"
+            $Error.Clear()
+            Enable-Mailbox -Identity $userName `
+                -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
+                -ManagedFolderMailboxPolicyAllowed:$true `
+                -DomainController $dc -ErrorAction SilentlyContinue
+
+            if ($Error[0] -ne $null) {
+                Write-Error $Error[0]
+                if ($Automated) {
+                    Out-File -Append -FilePath $errorsFile -InputObject "$userName,$start,$($Error[0].ToString())"
+                }
+                return
+            } 
+
+            $error.Clear()
+            # Set various attributes now that Exchange has helpfully removed them.
+            Write-Verbose "Resetting displayName and displayNamePrintable attributes to saved values"
+            Set-User -Identity $userName -DisplayName $displayName `
+                -SimpleDisplayName $displayNamePrintable `
+                -DomainController $dc `
+                -ErrorAction SilentlyContinue
+
+            # ...and if the object was a MailUser before, reset all of the Custom
+            # Attributes as well.
+            if ($objUser.RecipientTypeDetails -eq "MailUser") {
+                Write-Verbose "Resetting CustomAttributes (extensionAttribute*) 1 - 15 to saved values"
+                Set-Mailbox -Identity $userName `
+                    -CustomAttribute1 $customAttribute1 `
+                    -CustomAttribute2 $customAttribute2 `
+                    -CustomAttribute3 $customAttribute3 `
+                    -CustomAttribute4 $customAttribute4 `
+                    -CustomAttribute5 $customAttribute5 `
+                    -CustomAttribute6 $customAttribute6 `
+                    -CustomAttribute7 $customAttribute7 `
+                    -CustomAttribute8 $customAttribute8 `
+                    -CustomAttribute9 $customAttribute9 `
+                    -CustomAttribute10 $customAttribute10 `
+                    -CustomAttribute11 $customAttribute11 `
+                    -CustomAttribute12 $customAttribute12 `
+                    -CustomAttribute13 $customAttribute13 `
+                    -CustomAttribute14 $customAttribute14 `
+                    -CustomAttribute15 $customAttribute15 `
+                    -DomainController $dc `
+                    -ErrorAction SilentlyContinue
+            }
+
+            if ($EmailAddresses -eq $null) {
+                Write-Verbose "Not processing EmailAddresses; parameter was null."
+            } else {
+                Write-Verbose "Adding email addresses to $($userName)'s EmailAddresses collection"
+
+                $error.Clear()
+                $addrs = (Get-Recipient -Identity $userName).EmailAddresses
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Error $error[0]
+                }
+
+                foreach ($addr in $addrs) { 
+                    Write-Debug "Working on address $addr"
+                    if (!$EmailAddresses.Contains($addr)) {
+                        Write-Verbose "Adding $addr to the collection"
+                        $EmailAddresses.Add($addr) | Out-Null
+                    }
+                }
+
+                Write-Verbose "Setting Email Addresses for $userName"
+                $error.Clear()
+                Set-Mailbox -Identity $userName `
+                    -EmailAddressPolicyEnabled:$false `
+                    -EmailAddresses $EmailAddresses `
+                    -DomainController $dc
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Error $error[0]
+                }
+
+                Write-Debug "Reapplying Email Address Policy"
+                $error.Clear()
+                Set-Mailbox -Identity $userName `
+                    -EmailAddressPolicyEnabled:$true `
+                    -DomainController $dc
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Error $error[0]
+                }
+            }
+        } elseif ($MailUser -eq $true) {
+            # The user should be enabled as a MailUser instead of a Mailbox.
+            Write-Verbose "Enabling $userName as a MailUser"
+            $Error.Clear()
+            Enable-MailUser -Identity $userName `
+                -ExternalEmailAddress $ExternalEmailAddress `
+                -DomainController $dc
+
             if (![String]::IsNullOrEmpty($error[0])) {
-                Write-Output $error[0]
+                Write-Error $error[0]
+                if ($Automated) {
+                    Out-File -Append -FilePath $errorsFile -InputObject "$userName,$start,$($Error[0].ToString())"
+                }
+                return
+            } 
+
+            if ($EmailAddresses -eq $null) {
+                Write-Verbose "Not processing EmailAddresses; parameter was null."
+            } else {
+                Write-Verbose "Explicitly adding email addresses to $($userName)'s EmailAddresses collection"
+
+                $error.Clear()
+                $addrs = (Get-Recipient -Identity $userName).EmailAddresses
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Error $error[0]
+                }
+
+                foreach ($addr in $addrs) { 
+                    Write-Debug "Working on address $addr"
+                    if (!$EmailAddresses.Contains($addr)) {
+                        Write-Verbose "Adding $addr to the collection"
+                        $EmailAddresses.Add($addr) | Out-Null
+                    }
+                }
+
+                Write-Verbose "Setting Email Addresses for $userName"
+                $error.Clear()
+                Set-MailUser -Identity $userName `
+                    -EmailAddressPolicyEnabled:$false `
+                    -EmailAddresses $EmailAddresses `
+                    -DomainController $dc
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Error $error[0]
+                }
+
+                Write-Debug "Reapplying Email Address Policy"
+                $error.Clear()
+                Set-MailUser -Identity $userName `
+                    -EmailAddressPolicyEnabled:$true `
+                    -DomainController $dc
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Error $error[0]
+                }
             }
         }
-    }
-} # end 'PROCESS{}'
+
+        Write-Verbose "Ending provisioning process for `"$User`""
+    } # end 'PROCESS{}'
 
 # This section executes only once, after the pipeline.
-END {
-    exit $exitCode
-} # end 'END{}'
-
+    END {
+        Write-Verbose "Cleaning up"
+    } # end 'END{}'
+}

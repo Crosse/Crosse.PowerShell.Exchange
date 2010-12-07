@@ -24,149 +24,221 @@
 #
 ################################################################################
 
-param ( $User="",
-        [switch]$Confirm=$true,
-        [string]$ExternalEmailAddress=$null,
-        [switch]$Verbose=$false,
-        [string]$DomainController=$null,
-        $inputObject=$null )
+function Deprovision-User {
+    [CmdletBinding(SupportsShouldProcess=$true,
+        ConfirmImpact="High")]
+
+    param (
+            [Parameter(Mandatory=$true,
+                ValueFromPipeline=$true)]
+            [Alias("Identity")]
+            [Alias("Name")]
+            # The user to be deprovisioned
+            $User,
+        
+            [Parameter(Mandatory=$false)]
+            # The target email address for the user.  Using this parameter is
+            # only valid when you want to "deprovision" a UserMailbox into a
+            # MailUser.
+            [string]
+            $ExternalEmailAddress,
+
+            [Parameter(Mandatory=$false)]
+            $DomainController
+          )
 
 # This section executes only once, before the pipeline.
-BEGIN {
-    if ($inputObject) {
-        Write-Output $inputObject | &($MyInvocation.InvocationName)
-        break
-    }
+    BEGIN {
+        Write-Verbose "Performing initialization actions."
 
-    if ([String]::IsNullOrEmpty($DomainController)) {
-        $DomainController = (gc Env:\LOGONSERVER).Replace('\', '')
         if ([String]::IsNullOrEmpty($DomainController)) {
-            Write-Output "ERROR:  Could not determine the local computer's logon server!"
-            return
+            $dc = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().FindDomainController().Name
+
+            if ($dc -eq $null) {
+                Write-Error "Could not find a domain controller to use for the operation."
+                return
+            }
+        } else {
+            $dc = $DomainController
         }
-    }
-
-    $cwd = [System.IO.Path]::GetDirectoryName(($MyInvocation.MyCommand).Definition)
-
-    $exitCode = 0
-} # end 'BEGIN{}'
+        Write-Verbose "Using Domain Controller $dc"
+        
+        Write-Verbose "Initialization complete."
+    } # end 'BEGIN{}'
 
 # This section executes for each object in the pipeline.
-PROCESS {
-    if ( !($_) -and !($User) ) { 
-        Write-Output "No user given."
-        return
-    }
+    PROCESS {
+        Write-Verbose "Beginning deprovisioning process for `"$User`""
+        # Was a username passed to us?  If not, bail.
+        if ([String]::IsNullOrEmpty($User)) { 
+            Write-Error "User was null."
+            return
+        }
+        $userName = $User
 
-    if ($_) { $User = $_ }
+        Write-Verbose "Finding user in Active Directory"
+        $objUser = Get-User $User -ErrorAction SilentlyContinue
 
-# Was a username passed to us?  If not, bail.
-    if ([String]::IsNullOrEmpty($User)) { 
-        Write-Error "USAGE:  .\Deprovision-User.ps1 -User `$User -Server <mailboxServer>"
-        return
-    }
+        if ($objUser -eq $null) {
+            Write-Error "$User is not a valid user in Active Directory."
+            return
+        }
+        $userName = $objUser.SamAccountName
+        Write-Verbose "sAmAccountName:  $userName"
 
-    $objUser = Get-User $User -ErrorAction SilentlyContinue
-
-    if (!($objUser)) {
-        Write-Output "$User`tis not a valid user in Active Directory."
-        return
-    } else { 
-        $disabled = $false
-# Save this off because Exchange blanks it out...
+        # Save these off because Exchange blanks them out...
+        $displayName = $objUser.DisplayName
         $displayNamePrintable = $objUser.SimpleDisplayName
-        $emailAddresses = $null
+        Write-Verbose "displayName:  $displayName"
+        Write-Verbose "displayNamePrintable: $displayNamePrintable"
 
-        $error.Clear()
+        Write-Verbose "$userName is a $($objUser.RecipientTypeDetails)"
         switch ($objUser.RecipientTypeDetails) {
             'User' { 
-                Write-Output "$($objUser.SamAccountName) is already a User"
-                break
+                Write-Error "$userName is already a User, and cannot be deprovisioned further."
+                return
             }
             'MailUser' { 
-                Disable-MailUser -Identity $objUser.DistinguishedName -Confirm:$Confirm `
-                    -DomainController $DomainController -ErrorAction SilentlyContinue
+                if ([String]::IsNullOrEmpty($ExternalEmailAddress) -eq $false) {
+                    Write-Error "The ExternalEmailAddress parameter is only valid to deprovision a UserMailbox to a MailUser"
+                    return
+                }
+
+                Write-Verbose "Disabling $userName as a MailUser"
+                $error.Clear()
+                Disable-MailUser -Identity $userName -Confirm:$Confirm `
+                    -DomainController $dc -ErrorAction SilentlyContinue
 
                 if (![String]::IsNullOrEmpty($error[0])) {
-                    Write-Output $error[0]
-                } else {
-                    $disabled = $true
+                    Write-Error $error[0]
+                    return
                 }
                 break
             }
             'UserMailbox' {
-                $emailAddresses = (Get-Mailbox -Identity $objUser.Identity).EmailAddresses
+
+                # Save off any extra attributes that we'll need when we
+                # make this UserMailbox a MailUser.
+                Write-Verbose "Saving Exchange-specific attributes in order to reapply them later"
+                $recip = Get-Mailbox $userName
+                $legacyExchangeDn = $recip.LegacyExchangeDN
+                $emailAddresses = $recip.EmailAddresses
+
+                $customAttribute1  = $recip.CustomAttribute1
+                $customAttribute2  = $recip.CustomAttribute2
+                $customAttribute3  = $recip.CustomAttribute3
+                $customAttribute4  = $recip.CustomAttribute4
+                $customAttribute5  = $recip.CustomAttribute5
+                $customAttribute6  = $recip.CustomAttribute6
+                $customAttribute7  = $recip.CustomAttribute7
+                $customAttribute8  = $recip.CustomAttribute8
+                $customAttribute9  = $recip.CustomAttribute9
+                $customAttribute10 = $recip.CustomAttribute10
+                $customAttribute11 = $recip.CustomAttribute11
+                $customAttribute12 = $recip.CustomAttribute12
+                $customAttribute13 = $recip.CustomAttribute13
+                $customAttribute14 = $recip.CustomAttribute14
+                $customAttribute15 = $recip.CustomAttribute15
+
+                Write-Verbose "Disabling $userName as a UserMailbox"
+                $error.Clear()
                 Disable-Mailbox -Identity $objUser.DistinguishedName -Confirm:$Confirm `
-                    -DomainController $DomainController -ErrorAction SilentlyContinue
+                    -DomainController $dc -ErrorAction SilentlyContinue
 
                 if (![String]::IsNullOrEmpty($error[0])) {
-                    Write-Output $error[0]
-                } else {
-                    $disabled = $true
+                    Write-Error $error[0]
+                    return
                 }
-                break
-            }
-            default {
-                Write-Output "$($objUser.SamAccountName)`tis a $($objUser.RecipientTypeDetails) object, and I have no idea how to deprovision it."
-            }
-        }
-    }
 
-    if ($disabled -eq $true) {
-        # Set the SimpleDisplayName now that Exchange has helpfully removed it.
-        if ($Verbose) {
-            Write-Output "Resetting attributes on $($objUser.SamAccountName)"
+                foreach ($i in 1..12) {
+                    Write-Verbose "Waiting for Active Directory replication to finish..."
+                    Start-Sleep 5
+
+                    $objUser = Get-User $userName `
+                        -ErrorAction SilentlyContinue `
+                        -DomainController $dc
+
+                    if ($objUser.RecipientTypeDetails -eq "User") {
+                        Write-Verbose "Replication has finished."
+                        break
+                    }
+                }
+
+                if ($objUser -eq "UserMailbox") {
+                    Write-Error "An error occurred disabling $userName as a UserMailbox."
+                    return
+                }
+
+                Write-Verbose "$userName has been disabled as a UserMailbox"
+                break
+                }
+            default {
+                Write-Error "$userName is a $($objUser.RecipientTypeDetails) object, and I have no idea how to deprovision it."
+                return
+            }
         }
-        if (![String]::IsNullOrEmpty($displayNamePrintable)) {
+
+        if ($objUser.RecipientTypeDetails -eq 'User' -and 
+            [String]::IsNullOrEmpty($ExternalEmailAddress) -eq $false) {
+            Write-Verbose "Enabling user `"$userName`" as a MailUser with forwarding address of $ExternalEmailAddress"
             $error.Clear()
-            Set-User $objUser -SimpleDisplayName "$($displayNamePrintable)" `
-                -DomainController $DomainController -ErrorAction SilentlyContinue
+            Write-Verbose "Calling Provision-User"
+            Provision-User -User $userName -MailUser `
+                -ExternalEmailAddress $ExternalEmailAddress `
+                -EmailAddresses $EmailAddresses `
+                -Verbose:$Verbose -DomainController $dc
 
             if (![String]::IsNullOrEmpty($error[0])) {
-                Write-Output $error[0]
-            }
-        }
-        if ($objUser.RecipientTypeDetails -match 'UserMailbox' -and $ExternalEmailAddress -ne $null) {
-            $wait = 60
-            $continue = $false
-            while ($wait -gt 0) {
-                $objUser = Get-User $objUser.DistinguishedName `
-                            -ErrorAction SilentlyContinue `
-                            -DomainController $DomainController
-                if ($objUser -ne $null -and $objUser -eq "UserMailbox") {
-                    Start-Sleep 1
-                    $wait -= 1
-                } else {
-                    $continue = $true
-                    break
-                }
-            }
-
-            if ($continue -eq $false) {
-                Write-Output "An error occurred reprovisioning $($objUser.SamAccountName)."
-                $exitCode += 1
+                Write-Error $error[0]
                 return
             }
 
-            Write-Output "Enabling user as MailUser with forwarding address of $ExternalEmailAddress"
-            & "$cwd\Provision-User.ps1" -User $objUser.DistinguishedName `
-                -Mailbox:$false -Automated:$false `
-                -ExternalEmailAddress $ExternalEmailAddress `
-                -EmailAddresses $EmailAddresses `
-                -DomainController $DomainController
+            Write-Verbose "Provision-User finished"
+
+            # If the object was a UserMailbox before, reset all of the Custom
+            # Attributes.
+            if ($objUser.RecipientTypeDetails -eq "UserMailbox") {
+                Write-Verbose "Resetting CustomAttributes (extensionAttribute*) 1 - 15 to saved values"
+                Set-MailUser -Identity $userName `
+                    -CustomAttribute1 $customAttribute1 `
+                    -CustomAttribute2 $customAttribute2 `
+                    -CustomAttribute3 $customAttribute3 `
+                    -CustomAttribute4 $customAttribute4 `
+                    -CustomAttribute5 $customAttribute5 `
+                    -CustomAttribute6 $customAttribute6 `
+                    -CustomAttribute7 $customAttribute7 `
+                    -CustomAttribute8 $customAttribute8 `
+                    -CustomAttribute9 $customAttribute9 `
+                    -CustomAttribute10 $customAttribute10 `
+                    -CustomAttribute11 $customAttribute11 `
+                    -CustomAttribute12 $customAttribute12 `
+                    -CustomAttribute13 $customAttribute13 `
+                    -CustomAttribute14 $customAttribute14 `
+                    -CustomAttribute15 $customAttribute15 `
+                    -DomainController $dc `
+                    -ErrorAction SilentlyContinue
+            }
         }
 
-        if ($Verbose) {
-            Write-Output "$($objUser.SamAccountName) has been disabled as a $($objUser.RecipientTypeDetails)"
+        Write-Verbose "Resetting displayName and displayNamePrintable attributes to saved values"
+        # Set various attributes now that Exchange has helpfully removed them.
+        $error.Clear()
+        Set-User -Identity $userName -DisplayName $displayName `
+            -SimpleDisplayName $displayNamePrintable `
+            -DomainController $dc `
+            -ErrorAction SilentlyContinue
+
+        if (![String]::IsNullOrEmpty($error[0])) {
+            Write-Error $error[0]
+            return
         }
-    } else {
-        Write-Output "An error occurred deprovisioning $($objUser.SamAccountName)."
-        $exitCode += 1
-    }
-} # end 'PROCESS{}'
+
+
+        Write-Verbose "Ending deprovisioning process for `"$User`""
+    } # end 'PROCESS{}'
 
 # This section executes only once, after the pipeline.
-END {
-    exit $exitCode
-} # end 'END{}'
-
+    END {
+        Write-Verbose "Cleaning up"
+    } # end 'END{}'
+}
