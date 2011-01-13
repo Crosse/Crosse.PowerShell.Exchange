@@ -60,7 +60,12 @@ function Add-ProvisionedMailbox {
             [Parameter(Mandatory=$false)]
             [string]
             # The domain controller to use for all operations.
-            $DomainController
+            $DomainController,
+
+            [Parameter(Mandatory=$false)]
+            [string]
+            # Where to create MailContact objects, if necessary.
+            $MailContactOrganizationalUnit="ad.test.jmu.edu/ExchangeObjects/MailContacts"
         )
 
 # This section executes only once, before the pipeline.
@@ -203,10 +208,47 @@ function Add-ProvisionedMailbox {
                 }
                 return
             }
+            # Create a MailContact for the user using the saved details so that
+            # both addresses get listed in the GAL, etc.
+            $error.Clear()
+            Write-Verbose "Creating MailContact for $username"
+            $contact = New-MailContact `
+                            -Name "$($username)-mc" `
+                            -Alias "$($username)-mc" `
+                            -DisplayName "$($User.DisplayName) (Dukes)" `
+                            -FirstName "$($User.FirstName)" `
+                            -LastName "$($User.LastName)" `
+                            -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
+                            -OrganizationalUnit $MailContactOrganizationalUnit `
+                            -DomainController $DomainController `
+                            -ErrorAction SilentlyContinue
+
+            if ($contact -eq $null) {
+                Write-Error "An error occurred creating the MailContact for user $username.  The error was: $error[0]"
+                return
+            }
+
+            Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X.400 address"
+            $addr = "X.400:" + $savedAttributes["LegacyExchangeDN"]
+            $addr
+            $contact.EmailAddresses.Add($addr)
+            $error.clear()
+            Set-MailContact -Identity $contact.Identity `
+                            -EmailAddresses $contact.EmailAddresses `
+                            -DomainController $DomainController `
+                            -ErrorAction SilentlyContinue
+
+            $contact = Get-MailContact -Identity $contact.Identity -DomainController $DomainController -ErrorAction SilentlyContinue
+            if (!$contact.EmailAddresses.Contains($addr)) {
+                $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
+                $w += " as an X.400 address to the MailContact for $username.  "
+                $w += "You will need to add this manually.  The error was:  $error[0]"
+                Write-Warning $w
+            }
         }
 
         # Enable the mailbox.
-        Write-Verbose "Enabling `"$username`" as a UserMailbox"
+        Write-Verbose "Enabling $username as a UserMailbox"
         Enable-Mailbox  -Identity $username `
                         -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
                         -ManagedFolderMailboxPolicyAllowed:$true `
