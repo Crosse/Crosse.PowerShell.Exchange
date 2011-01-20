@@ -89,51 +89,65 @@ function Add-ProvisionedMailbox {
     PROCESS {
         Write-Verbose "Beginning provisioning process for `"$Identity`""
 
-        $User = $null
-        if ($Identity -is [System.String]) {
-            $User = Get-User -Identity $Identity -DomainController $DomainController -ErrorAction SilentlyContinue
-            if ($User -eq $null) {
-                Write-Error "$Identity is not a valid user in Active Directory."
-                return
-            }
-            Write-Verbose "Found user $User in Active Directory"
-        } elseif ($Identity -is [Microsoft.Exchange.Data.Directory.Management.User] -or
-                  $Identity -is [Microsoft.Exchange.Data.Directory.Management.MailEnabledOrgPerson] -or
-                  $Identity -is [Microsoft.Exchange.Data.Directory.ADObjectId] -or
-                  $Identity -is [Microsoft.Exchange.Data.Directory.ADObject]) {
-            $User = Get-User -Identity $Identity.Name -DomainController $DomainController
-        } else {
-            Write-Error "$Identity is of non-valid type $($Identity.GetType()) for this operation."
-            return
+        $resultObj = New-Object PSObject -Property @{
+            Identity                = $Identity
+            MailboxLocation         = $MailboxLocation
+            OriginalState           = $null
+            EndingState             = $null
+            MailContactCreated      = $false
+            ProvisioningSuccessful  = $false
+            Error                   = $null
         }
+            
+        $User = $null
+        try {
+            $User = Get-User -Identity $Identity -DomainController $DomainController -ErrorAction Stop
+        } catch {
+            $err = "$Identity is not a valid user in Active Directory:  ($_)."
+            Write-Error $err
+            $resultObj.Error = $err
+            return $resultObj
+        }
+        Write-Verbose "Found user $User in Active Directory"
 
         Write-Verbose "RecipientTypeDetails:  $($User.RecipientTypeDetails)"
         $username = $User.SamAccountName
+        $resultObj.Identity = $username
+        $resultObj.OriginalState = $User.RecipientTypeDetails
+        $resultObj.EndingState = $User.RecipientTypeDetails
 
         # We don't process disabled users, at least not right now.
         if ($User.RecipientTypeDetails -eq 'DisabledUser') {
-            Write-Error "$username is disabled in Active Directory.  Not performing any operations."
-            return
+            $err = "$username is disabled in Active Directory.  Not performing any operations."
+            Write-Error $err
+            $resultObj.Error = $err
+            return $resultObj
         }
 
         # There is no sense in processing a UserMailbox if "Local" 
         # was specified, since it already has a mailbox.
         if ($User.RecipientTypeDetails -eq 'UserMailbox' -and $MailboxLocation -eq 'Local') {
-            Write-Error "$username already has a local mailbox."
-            return
+            $err = "$username already has a local mailbox."
+            Write-Error $err
+            $resultObj.Error = $err
+            return $resultObj
         }
 
         # Another condition that doesn't make sense:  a MailUser getting a 
         # "Remote" mailbox.
         if ($User.RecipientTypeDetails -eq 'MailUser' -and $MailboxLocation -eq 'Remote') {
-            Write-Error "$username already has a remote mailbox."
-            return
+            $err = "$username already has a remote mailbox."
+            Write-Error $err
+            $resultObj.Error = $err
+            return $resultObj
         }
 
         # If "Remote" was specified, then an ExternalEmailAddress must also be present.
         if ($MailboxLocation -eq 'Remote' -and [String]::IsNullOrEmpty($ExternalEmailAddress)) {
-            Write-Error "An ExternalEmailAddress must be provided for the Remote mailbox type."
-            return
+            $err = "An ExternalEmailAddress must be provided for the Remote mailbox type."
+            Write-Error $err
+            $resultObj.Error = $err
+            return $resultObj
         }
 
 
@@ -149,9 +163,10 @@ function Add-ProvisionedMailbox {
         $warning += "$($MailboxLocation.ToLower()) mailbox."
 
         if (!$PSCmdlet.ShouldProcess($desc, $warning, $caption)) {
-            return
+            $resultObj.Error = "User cancelled the operation."
+            return $resultObj
         }
-            
+
         # Save some attributes that all user objects have.
         $savedAttributes = New-Object System.Collections.Hashtable
         $savedAttributes["DisplayName"] = $User.DisplayName
@@ -167,19 +182,26 @@ function Add-ProvisionedMailbox {
 
             $recipient = $null
             if ($User.RecipientTypeDetails -eq 'MailUser') {
-                $recipient = Get-MailUser $username -DomainController $DomainController
-                if ($recipient -eq $null) {
-                    Write-Error "Could not perform Get-MailUser on $username"
-                    return
+                try {
+                    $recipient = Get-MailUser $username -DomainController $DomainController -ErrorAction Stop
+                } catch {
+                    $err =  "Could not perform Get-MailUser on $username:  $_"
+                    Write-Error $err
+                    $resultObj.Error = $err
+                    return $resultObj
                 }
+
                 # Attributes that only MailUsers have.
                 $savedAttributes["ExternalEmailAddress"] = $recipient.ExternalEmailAddress
                 $savedAttributes["LegacyExchangeDN"] = $recipient.LegacyExchangeDN
-            } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') { 
-                $recipient = Get-Mailbox $username -DomainController $DomainController
-                if ($recipient -eq $null) {
-                    Write-Error "Could not perform Get-Mailbox on $username"
-                    return
+            } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
+                try {
+                    $recipient = Get-Mailbox $username -DomainController $DomainController -ErrorAction Stop
+                } catch {
+                    $err = "Could not perform Get-Mailbox on $username:  $_"
+                    Write-Error $err
+                    $resultObj.Error = $err
+                    return $resultObj
                 }
             }
 
@@ -198,10 +220,11 @@ function Add-ProvisionedMailbox {
             $savedAttributes["CustomAttribute12"] = $recipient.CustomAttribute12
             $savedAttributes["CustomAttribute13"] = $recipient.CustomAttribute13
             $savedAttributes["CustomAttribute14"] = $recipient.CustomAttribute14
-
-            # This will be the "last touched time" attribute.
-            $savedAttributes["CustomAttribute15"] = (Get-Date).ToFileTimeUtc()
         }
+
+            # This will be the "last touched time" attribute and should
+            # be set for object.
+            $savedAttributes["CustomAttribute15"] = "LastProvisioned: $(Get-Date -Format u)"
 
         foreach ($key in ($savedAttributes.Keys)) {
             Write-Verbose "$($key):`t$($savedAttributes[$key])"
@@ -213,18 +236,21 @@ function Add-ProvisionedMailbox {
             Write-Verbose "Disabling $username as a MailUser"
 
             try {
-                Disable-MailUser -Identity $username -DomainController $DomainController -Confirm:$false
+                Disable-MailUser `
+                    -Identity $username `
+                    -DomainController $DomainController `
+                    -Confirm:$false `
+                    -ErrorAction Stop
             } catch {
-                Write-Error $_
-                return
+                $err = "Could not run Disable-MailUser for user $username ($_)."
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
             }
 
-            # Object should now just be a "User".  Verify.
-            $User = Get-User -Identity $username -DomainController $DomainController -ErrorAction SilentlyContinue
-            if ($User.RecipientTypeDetails -ne 'User') {
-                Write-Error "Could not run Disable-MailUser for user $username."
-                return
-            }
+            # Object should now just be a "User".
+            $User = Get-User -Identity $username -DomainController $DomainController -ErrorAction Stop
+            $resultObj.EndingState = $User.RecipientTypeDetails
 
             # Since this user will become a UserMailbox, a MailContact needs 
             # to be created to preserve their current routing information.
@@ -249,15 +275,15 @@ function Add-ProvisionedMailbox {
                                 -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
                                 -OrganizationalUnit $MailContactOrganizationalUnit `
                                 -DomainController $DomainController `
+                                -ErrorAction Stop
             } catch {
-                Write-Error "Could not create contact for $username.  The error was:  $_"
-                return
+                $err =  "Could not create contact for $username.  The error was:  $_"
+                Write-Error $err
+                $resultObj.Error = $_
+                return $resultObj
             }
-                           
-            if ($contact -eq $null) {
-                Write-Error "Could not create the MailContact for $username."
-                return
-            }
+
+            $resultObj.MailContactCreated = $true
 
             if ([String]::IsNullOrEmpty($savedAttributes["LegacyExchangeDN"]) -eq $false) {
                 Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X.400 address"
@@ -268,12 +294,14 @@ function Add-ProvisionedMailbox {
                     $contact = Set-MailContact `
                                     -Identity $contact.Identity `
                                     -EmailAddresses $contact.EmailAddresses `
-                                    -DomainController $DomainController
+                                    -DomainController $DomainController `
+                                    -ErrorAction Stop
                 } catch {
                     $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
                     $w += " as an X.400 address to the MailContact for $username.  "
                     $w += "You will need to add this manually.  The error was:  $_"
                     Write-Warning $w
+                    $resultObj.Error = $w
                 }
                                
                 $contact = Get-MailContact -Identity $contact.Identity -DomainController $DomainController
@@ -299,13 +327,14 @@ function Add-ProvisionedMailbox {
                             -Identity $username `
                             -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
                             -ManagedFolderMailboxPolicyAllowed:$true `
-                            -DomainController $DomainController
+                            -DomainController $DomainController `
+                            -ErrorAction Stop
             } catch {
-                Write-Error "An error occurred while running Enable-Mailbox.  The error was: $_"
-                return
+                $err =  "An error occurred while running Enable-Mailbox.  The error was: $_"
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
             }
-
-            $User = Get-User -Identity $username -DomainController $DomainController
         } elseif ($MailboxLocation -eq 'Remote' -and $User.RecipientTypeDetails -eq 'User') {
             # Enable as MailUser.
             Write-Verbose "Enabling $username as a MailUser"
@@ -314,12 +343,17 @@ function Add-ProvisionedMailbox {
                 $User = Enable-MailUser `
                             -Identity $username `
                             -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
-                            -DomainController $DomainController
+                            -DomainController $DomainController `
+                            -ErrorAction Stop
             } catch {
-                Write-Error "An error occurred while running Enable-MailUser."
-                return
+                $err = "An error occurred while running Enable-MailUser:  $_"
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
             }
         }
+
+        $resultObj.EndingState = $User.RecipientTypeDetails
 
         # Reapply any saved attributes.
         if ($User.RecipientTypeDetails -eq 'MailUser' -or $User.RecipientTypeDetails -eq 'UserMailbox') {
@@ -338,18 +372,21 @@ function Add-ProvisionedMailbox {
                 }
                 $cmd += "-$($key) `"$($savedAttributes[$key])`" "
             }
-            $cmd += "-ErrorAction SilentlyContinue"
+            $cmd += "-ErrorAction Stop"
 
             Write-Verbose "Reapplying saved attributes"
 
             try {
                 Invoke-Expression $cmd
             } catch {
-                Write-Error "An error occurred while reapplying saved attributes.  The error was: $_"
-                return
+                $err =  "An error occurred while reapplying saved attributes.  The error was: $_"
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
             }
         }
-        Write-Host "$($username):  $MailboxLocation mailbox provisioned successfully."
+        $resultObj.ProvisioningSuccessful = $true
+        return $resultObj
     } # end 'PROCESS{}'
 
 # This section executes only once, after the pipeline.
