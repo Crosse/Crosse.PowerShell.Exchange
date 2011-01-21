@@ -118,7 +118,7 @@ function Add-ProvisionedMailbox {
 
         # We don't process disabled users, at least not right now.
         if ($User.RecipientTypeDetails -eq 'DisabledUser') {
-            $err = "$username is disabled in Active Directory.  Not performing any operations."
+            $err = "User is disabled in Active Directory.  Not performing any operations."
             Write-Error $err
             $resultObj.Error = $err
             return $resultObj
