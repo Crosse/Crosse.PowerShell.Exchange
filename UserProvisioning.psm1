@@ -127,6 +127,7 @@ function Add-ProvisionedMailbox {
         # There is no sense in processing a UserMailbox if "Local" 
         # was specified, since it already has a mailbox.
         if ($User.RecipientTypeDetails -eq 'UserMailbox' -and $MailboxLocation -eq 'Local') {
+            $resultObj.ProvisioningSuccessful = $true
             $err = "$username already has a local mailbox."
             Write-Error $err
             $resultObj.Error = $err
@@ -136,6 +137,7 @@ function Add-ProvisionedMailbox {
         # Another condition that doesn't make sense:  a MailUser getting a 
         # "Remote" mailbox.
         if ($User.RecipientTypeDetails -eq 'MailUser' -and $MailboxLocation -eq 'Remote') {
+            $resultObj.ProvisioningSuccessful = $true
             $err = "$username already has a remote mailbox."
             Write-Error $err
             $resultObj.Error = $err
@@ -386,6 +388,7 @@ function Add-ProvisionedMailbox {
             }
         }
         $resultObj.ProvisioningSuccessful = $true
+        $resultObj.Error = "$MailboxLocation mailbox provisioned."
         return $resultObj
     } # end 'PROCESS{}'
 
