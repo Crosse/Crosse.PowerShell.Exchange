@@ -65,7 +65,7 @@ function Add-ProvisionedMailbox {
             [Parameter(Mandatory=$false)]
             [string]
             # Where to create MailContact objects, if necessary.
-            $MailContactOrganizationalUnit="ad.test.jmu.edu/ExchangeObjects/MailContacts"
+            $MailContactOrganizationalUnit="Users"
         )
 
 # This section executes only once, before the pipeline.
