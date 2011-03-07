@@ -1,9 +1,9 @@
 ################################################################################
 # 
-# $URL$
-# $Author$
-# $Date$
-# $Rev$
+# $URL: https://www.crosse.org/svn/public/scripts/powershell/modules/Crosse.PowerShell.Exchange/UserProvisioning.psm1 $
+# $Author: seth $
+# $Date: 2011-01-24 11:04:17 -0500 (Mon, 24 Jan 2011) $
+# $Rev: 321 $
 # 
 # DESCRIPTION:  Provisions resources in Exchange for JMU
 # 
@@ -36,12 +36,6 @@ function Add-ProvisionedMailbox {
             # Specifies the user to be provisioned.
             $Identity,
 
-            [Parameter(Mandatory=$false)]
-            # Whether to force-create a mailbox for a user, even if they would
-            # not normally be a candidate for a mailbox
-            [switch]
-            $Force,
-
             [Parameter(Mandatory=$true,
                 ValueFromPipelineByPropertyName=$true)]
             [ValidateSet("Local", "Remote")]
@@ -59,13 +53,27 @@ function Add-ProvisionedMailbox {
 
             [Parameter(Mandatory=$false)]
             [string]
+            # Where to create MailContact objects, if necessary.
+            $MailContactOrganizationalUnit="Users",
+
+            [Parameter(Mandatory=$false)]
+            [ValidateScript( { Test-Path $_ } )]
+            [ValidateNotNullOrEmpty()]
+            # Location of the email template.
+            [string]
+            $EmailTemplatePath=(Join-Path $PSScriptRoot "New$($MailboxLocation)Mailbox.txt")
+
+            [Parameter(Mandatory=$false)]
+            [string]
             # The domain controller to use for all operations.
             $DomainController,
 
             [Parameter(Mandatory=$false)]
-            [string]
-            # Where to create MailContact objects, if necessary.
-            $MailContactOrganizationalUnit="Users"
+            # If the user already had a mailbox (local or remote), and 
+            # is now getting another, send the user an email to their 
+            # previous mailbox alerting them to this fact.
+            [switch]
+            $EmailUserIfNeeded=$true
         )
 
 # This section executes only once, before the pipeline.
@@ -97,6 +105,7 @@ function Add-ProvisionedMailbox {
             MailContactCreated      = $false
             ProvisioningSuccessful  = $false
             Error                   = $null
+            EmailSentTo             = $null
         }
             
         $User = $null
@@ -387,6 +396,28 @@ function Add-ProvisionedMailbox {
                 return $resultObj
             }
         }
+
+        if ($resultObj.MailContactCreated -eq $true -and $EmailUserIfNeeded -eq $true) {
+            #  Send the user an email
+            $template = Get-Content $EmailTemplatePath
+            if ([String]::IsNullOrEmpty($template)) {
+                Write-Warning "Template email `"$EmailTemplatePath`" did not contain any data."
+            } else {
+                $template.Replace("<Identity>", $Identity)
+                $template.Replace("<FirstName>", $User.FirstName)
+                $template.Replace("<LastName>", $User.LastName)
+                if ($MailboxLocation -eq "Local") {
+                    $template.Replace("<NewEmailAddress>", $User.PrimarySmtpAddress.ToString())
+                    $to = $savedAttributes["ExternalEmailAddress"]
+                } else {
+                    $template.Replace("<NewEmailAddress>", $savedAttributes["ExternalEmailAddress"])
+                    $to = $User.PrimarySmtpAddress.ToString()
+                }
+            }
+
+            Send-MailMessage -To $to -From helpdesk@jmu.edu
+        }            
+
         $resultObj.ProvisioningSuccessful = $true
         $resultObj.Error = "$MailboxLocation mailbox provisioned."
         return $resultObj
