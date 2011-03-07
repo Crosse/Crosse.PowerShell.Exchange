@@ -24,17 +24,14 @@ function Get-RedirectRuleInformation {
             $processed = $true
         }
 
-        if ($rules -eq $null) { 
-            $redirectTo = $null
-        } else {
-            foreach ($rule in $rules) { 
-                if ($rule.Enabled -eq $true -and $rule.RedirectTo -ne $null) { 
-                    foreach ($redirect in $rule.RedirectTo) {
-                        $redirectTo = $redirect.Replace("`"", "'")
-                    }
-                } 
+        $redirectTo = $null
+        foreach ($rule in $rules) { 
+            if ($rule.Enabled -eq $true -and $rule.RedirectTo -ne $null) { 
+                foreach ($redirect in $rule.RedirectTo) {
+                    $redirectTo = $redirect.Replace("`"", "'")
+                }
             } 
-        }
+        } 
 
         New-Object PSObject -Property @{ 
             "Identity"          = $mailbox.Name
