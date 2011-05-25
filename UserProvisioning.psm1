@@ -36,6 +36,12 @@ function Add-ProvisionedMailbox {
             # Specifies the user to be provisioned.
             $Identity,
 
+            [Parameter(Mandatory=$false)]
+            # Whether to force-create a mailbox for a user, even if they would
+            # not normally be a candidate for a mailbox
+            [switch]
+            $Force,
+
             [Parameter(Mandatory=$true,
                 ValueFromPipelineByPropertyName=$true)]
             [ValidateSet("Local", "Remote")]
@@ -53,27 +59,13 @@ function Add-ProvisionedMailbox {
 
             [Parameter(Mandatory=$false)]
             [string]
-            # Where to create MailContact objects, if necessary.
-            $MailContactOrganizationalUnit="Users",
-
-            [Parameter(Mandatory=$false)]
-            [ValidateScript( { Test-Path $_ } )]
-            [ValidateNotNullOrEmpty()]
-            # Location of the email template.
-            [string]
-            $EmailTemplatePath=(Join-Path $PSScriptRoot "New$($MailboxLocation)Mailbox.txt")
-
-            [Parameter(Mandatory=$false)]
-            [string]
             # The domain controller to use for all operations.
             $DomainController,
 
             [Parameter(Mandatory=$false)]
-            # If the user already had a mailbox (local or remote), and 
-            # is now getting another, send the user an email to their 
-            # previous mailbox alerting them to this fact.
-            [switch]
-            $EmailUserIfNeeded=$true
+            [string]
+            # Where to create MailContact objects, if necessary.
+            $MailContactOrganizationalUnit="Users"
         )
 
 # This section executes only once, before the pipeline.
@@ -81,14 +73,17 @@ function Add-ProvisionedMailbox {
         Write-Verbose "Performing initialization actions."
 
         if ([String]::IsNullOrEmpty($DomainController)) {
-            $DomainController = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().FindDomainController().Name
+            $dc = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().FindDomainController().Name
 
-            if ($DomainController -eq $null) {
+            if ($dc -eq $null) {
                 Write-Error "Could not find a domain controller to use for the operation."
                 return
             }
+        } else {
+            $dc = $DomainController
         }
-        Write-Verbose "Using Domain Controller $DomainController"
+
+        Write-Verbose "Using Domain Controller $dc"
         Write-Verbose "Initialization complete."
     } # end 'BEGIN{}'
 
@@ -105,12 +100,12 @@ function Add-ProvisionedMailbox {
             MailContactCreated      = $false
             ProvisioningSuccessful  = $false
             Error                   = $null
-            EmailSentTo             = $null
         }
             
         $User = $null
         try {
-            $User = Get-User -Identity $Identity -DomainController $DomainController -ErrorAction Stop
+            Write-Verbose "Using Domain Controller $dc"
+            $User = Get-User -Identity $Identity -DomainController $dc -ErrorAction Stop
         } catch {
             $err = "$Identity is not a valid user in Active Directory:  ($_)."
             Write-Error $err
@@ -194,7 +189,7 @@ function Add-ProvisionedMailbox {
             $recipient = $null
             if ($User.RecipientTypeDetails -eq 'MailUser') {
                 try {
-                    $recipient = Get-MailUser $username -DomainController $DomainController -ErrorAction Stop
+                    $recipient = Get-MailUser $username -DomainController $dc -ErrorAction Stop
                 } catch {
                     $err =  "Could not perform Get-MailUser on $username:  $_"
                     Write-Error $err
@@ -207,7 +202,7 @@ function Add-ProvisionedMailbox {
                 $savedAttributes["LegacyExchangeDN"] = $recipient.LegacyExchangeDN
             } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
                 try {
-                    $recipient = Get-Mailbox $username -DomainController $DomainController -ErrorAction Stop
+                    $recipient = Get-Mailbox $username -DomainController $dc -ErrorAction Stop
                 } catch {
                     $err = "Could not perform Get-Mailbox on $username:  $_"
                     Write-Error $err
@@ -249,7 +244,7 @@ function Add-ProvisionedMailbox {
             try {
                 Disable-MailUser `
                     -Identity $username `
-                    -DomainController $DomainController `
+                    -DomainController $dc `
                     -Confirm:$false `
                     -ErrorAction Stop
             } catch {
@@ -260,7 +255,7 @@ function Add-ProvisionedMailbox {
             }
 
             # Object should now just be a "User".
-            $User = Get-User -Identity $username -DomainController $DomainController -ErrorAction Stop
+            $User = Get-User -Identity $username -DomainController $dc -ErrorAction Stop
             $resultObj.EndingState = $User.RecipientTypeDetails
 
             # Since this user will become a UserMailbox, a MailContact needs 
@@ -285,7 +280,7 @@ function Add-ProvisionedMailbox {
                                 -LastName "$($User.LastName)" `
                                 -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
                                 -OrganizationalUnit $MailContactOrganizationalUnit `
-                                -DomainController $DomainController `
+                                -DomainController $dc `
                                 -ErrorAction Stop
             } catch {
                 $err =  "Could not create contact for $username.  The error was:  $_"
@@ -305,7 +300,7 @@ function Add-ProvisionedMailbox {
                     $contact = Set-MailContact `
                                     -Identity $contact.Identity `
                                     -EmailAddresses $contact.EmailAddresses `
-                                    -DomainController $DomainController `
+                                    -DomainController $dc `
                                     -ErrorAction Stop
                 } catch {
                     $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
@@ -315,7 +310,7 @@ function Add-ProvisionedMailbox {
                     $resultObj.Error = $w
                 }
                                
-                $contact = Get-MailContact -Identity $contact.Identity -DomainController $DomainController
+                $contact = Get-MailContact -Identity $contact.Identity -DomainController $dc
             }
         }
 
@@ -338,7 +333,7 @@ function Add-ProvisionedMailbox {
                             -Identity $username `
                             -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
                             -ManagedFolderMailboxPolicyAllowed:$true `
-                            -DomainController $DomainController `
+                            -DomainController $dc `
                             -ErrorAction Stop
             } catch {
                 $err =  "An error occurred while running Enable-Mailbox.  The error was: $_"
@@ -354,7 +349,7 @@ function Add-ProvisionedMailbox {
                 $User = Enable-MailUser `
                             -Identity $username `
                             -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
-                            -DomainController $DomainController `
+                            -DomainController $dc `
                             -ErrorAction Stop
             } catch {
                 $err = "An error occurred while running Enable-MailUser:  $_"
@@ -369,11 +364,11 @@ function Add-ProvisionedMailbox {
         # Reapply any saved attributes.
         if ($User.RecipientTypeDetails -eq 'MailUser' -or $User.RecipientTypeDetails -eq 'UserMailbox') {
             if ($User.RecipientTypeDetails -eq 'MailUser') {
-                $cmd += "Set-MailUser "
+                $cmd = "Set-MailUser "
             } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
-                $cmd += "Set-Mailbox "
+                $cmd = "Set-Mailbox "
             }
-            $cmd += "-Identity $Identity -DomainController $DomainController "
+            $cmd += "-Identity $Identity -DomainController $dc "
 
             foreach ($key in $savedAttributes.Keys) {
                 if ($key -eq 'LegacyExchangeDN' -or 
@@ -388,6 +383,7 @@ function Add-ProvisionedMailbox {
             Write-Verbose "Reapplying saved attributes"
 
             try {
+                Write-Verbose "Executing command `"$cmd`""
                 Invoke-Expression $cmd
             } catch {
                 $err =  "An error occurred while reapplying saved attributes.  The error was: $_"
@@ -396,28 +392,6 @@ function Add-ProvisionedMailbox {
                 return $resultObj
             }
         }
-
-        if ($resultObj.MailContactCreated -eq $true -and $EmailUserIfNeeded -eq $true) {
-            #  Send the user an email
-            $template = Get-Content $EmailTemplatePath
-            if ([String]::IsNullOrEmpty($template)) {
-                Write-Warning "Template email `"$EmailTemplatePath`" did not contain any data."
-            } else {
-                $template.Replace("<Identity>", $Identity)
-                $template.Replace("<FirstName>", $User.FirstName)
-                $template.Replace("<LastName>", $User.LastName)
-                if ($MailboxLocation -eq "Local") {
-                    $template.Replace("<NewEmailAddress>", $User.PrimarySmtpAddress.ToString())
-                    $to = $savedAttributes["ExternalEmailAddress"]
-                } else {
-                    $template.Replace("<NewEmailAddress>", $savedAttributes["ExternalEmailAddress"])
-                    $to = $User.PrimarySmtpAddress.ToString()
-                }
-            }
-
-            Send-MailMessage -To $to -From helpdesk@jmu.edu
-        }            
-
         $resultObj.ProvisioningSuccessful = $true
         $resultObj.Error = "$MailboxLocation mailbox provisioned."
         return $resultObj
