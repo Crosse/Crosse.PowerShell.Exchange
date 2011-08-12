@@ -36,12 +36,6 @@ function Add-ProvisionedMailbox {
             # Specifies the user to be provisioned.
             $Identity,
 
-            [Parameter(Mandatory=$false)]
-            # Whether to force-create a mailbox for a user, even if they would
-            # not normally be a candidate for a mailbox
-            [switch]
-            $Force,
-
             [Parameter(Mandatory=$true,
                 ValueFromPipelineByPropertyName=$true)]
             [ValidateSet("Local", "Remote")]
