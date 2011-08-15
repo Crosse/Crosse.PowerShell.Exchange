@@ -46,6 +46,11 @@ function Add-ProvisionedMailbox {
             $ExternalEmailAddress,
 
             [Parameter(Mandatory=$false)]
+            [switch]
+            # Specifies whether or not email notifications will be sent about the new mailbox.
+            $SendEmailNotification=$true,
+
+            [Parameter(Mandatory=$false)]
             [string]
             # The domain controller to use for all operations.
             $DomainController,
@@ -87,6 +92,7 @@ function Add-ProvisionedMailbox {
             OriginalState           = $null
             EndingState             = $null
             MailContactCreated      = $false
+            EmailSent               = $false
             ProvisioningSuccessful  = $false
             Error                   = $null
         }
@@ -407,7 +413,36 @@ function Add-ProvisionedMailbox {
             $resultObj.Error = $err
             return $resultObj
         }
-        # TODO: Send an email here.
+
+        # Send emails where appropriate.
+        if ($SendEmailNotification -eq $true) {
+            $welcomeEmail = $null
+            $notifyEmail = $null
+
+            if ($MailboxLocation -eq "Local") {
+                $welcomeEmail = $User.PrimarySmtpAddress
+                if ($contact -ne $null) {
+                    $notifyEmail = $contact.ExternalEmailAddress
+                }
+            } elseif ($MailboxLocation -eq "Remote") {
+                if ($contact -eq $null) {
+                    $welcomeEmail = $User.ExternalEmailAddress
+                } else {
+                    $welcomeEmail = $contact.ExternalEmailAddress
+                    $notifyEmail = $User.PrimarySmtpAddress
+                }
+            }
+
+            if ($welcomeEmail -ne $null) {
+                Write-Verbose "Sending Welcome email to $welcomeEmail"
+            }
+            if ($notifyEmail -ne $null) {
+                Write-Verbose "Sending Notify email to $notifyEmail"
+            }
+        } else {
+            Write-Verbose "Not sending emails"
+        }
+
         $resultObj.ProvisioningSuccessful = $true
         $resultObj.Error = "$MailboxLocation mailbox provisioned."
         return $resultObj
