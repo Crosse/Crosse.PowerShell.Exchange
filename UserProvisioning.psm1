@@ -177,9 +177,8 @@ function Add-ProvisionedMailbox {
         if ($User.RecipientTypeDetails -eq 'MailUser' -or
             $User.RecipientTypeDetails -eq 'UserMailbox') {
 
-            $recipient = $null
             try {
-                $recipient = Get-Recipient $username -DomainController $dc -ErrorAction Stop
+                $User = Get-Recipient $username -DomainController $dc -ErrorAction Stop
             } catch {
                 $err = "Could not perform Get-Recipient on $username:  $_"
                 Write-Error $err
@@ -189,25 +188,25 @@ function Add-ProvisionedMailbox {
 
             if ($User.RecipientTypeDetails -eq 'MailUser') {
                 # Attributes that only MailUsers have.
-                $savedAttributes["ExternalEmailAddress"] = $recipient.ExternalEmailAddress
-                $savedAttributes["LegacyExchangeDN"] = $recipient.LegacyExchangeDN
+                $savedAttributes["ExternalEmailAddress"] = $User.ExternalEmailAddress
+                $savedAttributes["LegacyExchangeDN"] = $User.LegacyExchangeDN
             }
 
             # Attributes that both MailUsers and UserMailboxes have.
-            $savedAttributes["CustomAttribute1"] = $recipient.CustomAttribute1
-            $savedAttributes["CustomAttribute2"] = $recipient.CustomAttribute2
-            $savedAttributes["CustomAttribute3"] = $recipient.CustomAttribute3
-            $savedAttributes["CustomAttribute4"] = $recipient.CustomAttribute4
-            $savedAttributes["CustomAttribute5"] = $recipient.CustomAttribute5
-            $savedAttributes["CustomAttribute6"] = $recipient.CustomAttribute6
-            $savedAttributes["CustomAttribute7"] = $recipient.CustomAttribute7
-            $savedAttributes["CustomAttribute8"] = $recipient.CustomAttribute8
-            $savedAttributes["CustomAttribute9"] = $recipient.CustomAttribute9
-            $savedAttributes["CustomAttribute10"] = $recipient.CustomAttribute10
-            $savedAttributes["CustomAttribute11"] = $recipient.CustomAttribute11
-            $savedAttributes["CustomAttribute12"] = $recipient.CustomAttribute12
-            $savedAttributes["CustomAttribute13"] = $recipient.CustomAttribute13
-            $savedAttributes["CustomAttribute14"] = $recipient.CustomAttribute14
+            $savedAttributes["CustomAttribute1"] = $User.CustomAttribute1
+            $savedAttributes["CustomAttribute2"] = $User.CustomAttribute2
+            $savedAttributes["CustomAttribute3"] = $User.CustomAttribute3
+            $savedAttributes["CustomAttribute4"] = $User.CustomAttribute4
+            $savedAttributes["CustomAttribute5"] = $User.CustomAttribute5
+            $savedAttributes["CustomAttribute6"] = $User.CustomAttribute6
+            $savedAttributes["CustomAttribute7"] = $User.CustomAttribute7
+            $savedAttributes["CustomAttribute8"] = $User.CustomAttribute8
+            $savedAttributes["CustomAttribute9"] = $User.CustomAttribute9
+            $savedAttributes["CustomAttribute10"] = $User.CustomAttribute10
+            $savedAttributes["CustomAttribute11"] = $User.CustomAttribute11
+            $savedAttributes["CustomAttribute12"] = $User.CustomAttribute12
+            $savedAttributes["CustomAttribute13"] = $User.CustomAttribute13
+            $savedAttributes["CustomAttribute14"] = $User.CustomAttribute14
         }
 
         # This will be the "last touched time" attribute and should
@@ -400,7 +399,7 @@ function Add-ProvisionedMailbox {
         Write-Verbose "Reapplying saved attributes"
 
         try {
-            Write-Verbose "Executing command `"$cmd`""
+            Write-Debug "Executing command `"$cmd`""
             Invoke-Expression $cmd
         } catch {
             $err =  "An error occurred while reapplying saved attributes.  The error was: $_"
