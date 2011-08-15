@@ -1,14 +1,8 @@
 ################################################################################
 # 
-# $URL: https://www.crosse.org/svn/public/scripts/powershell/modules/Crosse.PowerShell.Exchange/UserProvisioning.psm1 $
-# $Author: seth $
-# $Date: 2011-01-24 11:04:17 -0500 (Mon, 24 Jan 2011) $
-# $Rev: 321 $
-# 
 # DESCRIPTION:  Provisions resources in Exchange for JMU
 # 
-# 
-# Copyright (c) 2009,2010 Seth Wright <wrightst@jmu.edu>
+# Copyright (c) 2009-2011 Seth Wright <wrightst@jmu.edu>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -62,12 +56,13 @@ function Add-ProvisionedMailbox {
             $MailContactOrganizationalUnit="Users"
         )
 
-# This section executes only once, before the pipeline.
+    # This section executes only once, before the pipeline.
     BEGIN {
         Write-Verbose "Performing initialization actions."
 
         if ([String]::IsNullOrEmpty($DomainController)) {
-            $dc = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().FindDomainController().Name
+            $dc = [System.DirectoryServices.ActiveDirectory.Domain]::`
+                    GetCurrentDomain().FindDomainController().Name
 
             if ($dc -eq $null) {
                 Write-Error "Could not find a domain controller to use for the operation."
@@ -82,7 +77,7 @@ function Add-ProvisionedMailbox {
     } # end 'BEGIN{}'
 
     
-# This section executes for each object in the pipeline.
+    # This section executes for each object in the pipeline.
     PROCESS {
         Write-Verbose "Beginning provisioning process for `"$Identity`""
 
@@ -172,6 +167,8 @@ function Add-ProvisionedMailbox {
         $savedAttributes["DisplayName"] = $User.DisplayName
         $savedAttributes["SimpleDisplayName"] = $User.SimpleDisplayName
 
+        # It's not a "saved attribute", per se, but it'll be handled in
+        # the same way as a MailUser's ExternalEmailAddress attribute.
         if ([String]::IsNullOrEmpty($ExternalEmailAddress) -eq $false) {
             $savedAttributes["ExternalEmailAddress"] = $ExternalEmailAddress
         }
@@ -181,28 +178,19 @@ function Add-ProvisionedMailbox {
             $User.RecipientTypeDetails -eq 'UserMailbox') {
 
             $recipient = $null
-            if ($User.RecipientTypeDetails -eq 'MailUser') {
-                try {
-                    $recipient = Get-MailUser $username -DomainController $dc -ErrorAction Stop
-                } catch {
-                    $err =  "Could not perform Get-MailUser on $username:  $_"
-                    Write-Error $err
-                    $resultObj.Error = $err
-                    return $resultObj
-                }
+            try {
+                $recipient = Get-Recipient $username -DomainController $dc -ErrorAction Stop
+            } catch {
+                $err = "Could not perform Get-Recipient on $username:  $_"
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
+            }
 
+            if ($User.RecipientTypeDetails -eq 'MailUser') {
                 # Attributes that only MailUsers have.
                 $savedAttributes["ExternalEmailAddress"] = $recipient.ExternalEmailAddress
                 $savedAttributes["LegacyExchangeDN"] = $recipient.LegacyExchangeDN
-            } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
-                try {
-                    $recipient = Get-Mailbox $username -DomainController $dc -ErrorAction Stop
-                } catch {
-                    $err = "Could not perform Get-Mailbox on $username:  $_"
-                    Write-Error $err
-                    $resultObj.Error = $err
-                    return $resultObj
-                }
             }
 
             # Attributes that both MailUsers and UserMailboxes have.
@@ -222,11 +210,12 @@ function Add-ProvisionedMailbox {
             $savedAttributes["CustomAttribute14"] = $recipient.CustomAttribute14
         }
 
-            # This will be the "last touched time" attribute and should
-            # be set for object.
-            $savedAttributes["CustomAttribute15"] = "LastProvisioned: $(Get-Date -Format u)"
+        # This will be the "last touched time" attribute and should
+        # be set for object.
+        $savedAttributes["CustomAttribute15"] = "LastProvisioned: $(Get-Date -Format u)"
 
-        foreach ($key in ($savedAttributes.Keys)) {
+        # Print out everything we know about the user so far (-Verbose)
+        foreach ($key in ($savedAttributes.Keys | Sort)) {
             Write-Verbose "$($key):`t$($savedAttributes[$key])"
         }
 
@@ -265,55 +254,89 @@ function Add-ProvisionedMailbox {
         if ($createContact -eq $true)
         {
             Write-Verbose "Creating MailContact for $username"
-            try {
-                $contact = New-MailContact `
-                                -Name "$($username)-mc" `
-                                -Alias "$($username)-mc" `
-                                -DisplayName "$($User.DisplayName) (Dukes)" `
-                                -FirstName "$($User.FirstName)" `
-                                -LastName "$($User.LastName)" `
-                                -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
-                                -OrganizationalUnit $MailContactOrganizationalUnit `
-                                -DomainController $dc `
-                                -ErrorAction Stop
-            } catch {
-                $err =  "Could not create contact for $username.  The error was:  $_"
-                Write-Error $err
-                $resultObj.Error = $_
-                return $resultObj
+            
+            $contact = Get-MailContact -Identity "$($username)-mc" `
+                            -DomainController $dc `
+                            -ErrorAction SilentlyContinue
+
+            if ($contact -eq $null) {
+                try {
+                    # TODO:  Remove the JMU-specific "(Dukes)" bit in the DisplayName.
+                    # I don't know what to replace it with, though.  "(External)"?
+                    $contact = New-MailContact `
+                                    -Name "$($username)-mc" `
+                                    -Alias "$($username)-mc" `
+                                    -DisplayName "$($User.DisplayName) (Dukes)" `
+                                    -FirstName "$($User.FirstName)" `
+                                    -LastName "$($User.LastName)" `
+                                    -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
+                                    -OrganizationalUnit $MailContactOrganizationalUnit `
+                                    -DomainController $dc `
+                                    -ErrorAction Stop
+                } catch {
+                    $err =  "Could not create contact for $username.  The error was:  $_"
+                    Write-Error $err
+                    $resultObj.Error = $_
+                    return $resultObj
+                }
+            } else {
+                Write-Warning "MailContact already exists for $username"
+                try {
+                    # TODO:  Remove the JMU-specific "(Dukes)" bit in the DisplayName.
+                    # I don't know what to replace it with, though.  "(External)"?
+                    # Also, -FirstName and -LastName don't exist for Set-MailContact.  WTF?
+                    Set-MailContact -Identity "$($username)-mc" `
+                        -Name "$($username)-mc" `
+                        -Alias "$($username)-mc" `
+                        -DisplayName "$($User.DisplayName) (Dukes)" `
+                        -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
+                        -DomainController $dc `
+                        -ErrorAction Stop
+                } catch {
+                    $err =  "Could not modify existing contact for $username.  The error was:  $_"
+                    Write-Error $err
+                    $resultObj.Error = $_
+                    return $resultObj
+                }
             }
 
             $resultObj.MailContactCreated = $true
 
             if ([String]::IsNullOrEmpty($savedAttributes["LegacyExchangeDN"]) -eq $false) {
-                Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X.400 address"
                 $addr = "X.400:" + $savedAttributes["LegacyExchangeDN"]
-                $contact.EmailAddresses.Add($addr)
 
-                try {
-                    $contact = Set-MailContact `
-                                    -Identity $contact.Identity `
-                                    -EmailAddresses $contact.EmailAddresses `
-                                    -DomainController $dc `
-                                    -ErrorAction Stop
-                } catch {
-                    $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
-                    $w += " as an X.400 address to the MailContact for $username.  "
-                    $w += "You will need to add this manually.  The error was:  $_"
-                    Write-Warning $w
-                    $resultObj.Error = $w
+                # Only add the X.400 address if it doesn't already exist.
+                if ($contact.EmailAddresses.Contains($addr) -eq $false) {
+                    Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X.400 address"
+                    $contact.EmailAddresses.Add($addr)
+
+                    try {
+                        $contact = Set-MailContact `
+                                        -Identity $contact.Identity `
+                                        -EmailAddresses $contact.EmailAddresses `
+                                        -DomainController $dc `
+                                        -ErrorAction Stop
+                    } catch {
+                        $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
+                        $w += " as an X.400 address to the MailContact for $username.  "
+                        $w += "You will need to add this manually.  The error was:  $_"
+                        Write-Warning $w
+                        $resultObj.Error = $w
+                    }
+                } else {
+                    Write-Verbose "LegacyExchangeDN already exists as an X.400 address"
                 }
-                               
+
                 $contact = Get-MailContact -Identity $contact.Identity -DomainController $dc
             }
         }
 
-        # At this point, the following is true:
-        # * If "Remote" was specified and the object is a UserMailbox, a 
-        #   MailContact has been created and that's all that needs to happen.
-        #   
+        # At this point, the following should be true:
         # * If "Local" was specified--no matter what type the object was as 
         #   the start--then the object will be enabled as a UserMailbox.
+        #   
+        # * If "Remote" was specified and the object is a UserMailbox, a 
+        #   MailContact has been created and that's all that needs to happen.
         #   
         # * If "Remote" was specified and the object is a User, the object will
         #   be enabled as a MailUser.
@@ -323,6 +346,7 @@ function Add-ProvisionedMailbox {
             Write-Verbose "Enabling $username as a UserMailbox"
 
             try {
+                # TODO:  Remove the JMU-specific bit about the ManagedFolderMailboxPolicy.
                 $User = Enable-Mailbox `
                             -Identity $username `
                             -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
@@ -356,42 +380,41 @@ function Add-ProvisionedMailbox {
         $resultObj.EndingState = $User.RecipientTypeDetails
 
         # Reapply any saved attributes.
-        if ($User.RecipientTypeDetails -eq 'MailUser' -or $User.RecipientTypeDetails -eq 'UserMailbox') {
-            if ($User.RecipientTypeDetails -eq 'MailUser') {
-                $cmd = "Set-MailUser "
-            } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
-                $cmd = "Set-Mailbox "
-            }
-            $cmd += "-Identity $Identity -DomainController $dc "
-
-            foreach ($key in $savedAttributes.Keys) {
-                if ($key -eq 'LegacyExchangeDN' -or 
-                    $key -eq 'ExternalEmailAddress' -or
-                    [String]::IsNullOrEmpty($savedAttributes[$key])) {
-                    continue
-                }
-                $cmd += "-$($key) `"$($savedAttributes[$key])`" "
-            }
-            $cmd += "-ErrorAction Stop"
-
-            Write-Verbose "Reapplying saved attributes"
-
-            try {
-                Write-Verbose "Executing command `"$cmd`""
-                Invoke-Expression $cmd
-            } catch {
-                $err =  "An error occurred while reapplying saved attributes.  The error was: $_"
-                Write-Error $err
-                $resultObj.Error = $err
-                return $resultObj
-            }
+        if ($User.RecipientTypeDetails -eq 'MailUser') {
+            $cmd = "Set-MailUser "
+        } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
+            $cmd = "Set-Mailbox "
         }
+        $cmd += "-Identity $Identity -DomainController $dc "
+
+        foreach ($key in $savedAttributes.Keys) {
+            if ($key -eq 'LegacyExchangeDN' -or 
+                $key -eq 'ExternalEmailAddress' -or
+                [String]::IsNullOrEmpty($savedAttributes[$key])) {
+                continue
+            }
+            $cmd += "-$($key) `"$($savedAttributes[$key])`" "
+        }
+        $cmd += "-ErrorAction Stop"
+
+        Write-Verbose "Reapplying saved attributes"
+
+        try {
+            Write-Verbose "Executing command `"$cmd`""
+            Invoke-Expression $cmd
+        } catch {
+            $err =  "An error occurred while reapplying saved attributes.  The error was: $_"
+            Write-Error $err
+            $resultObj.Error = $err
+            return $resultObj
+        }
+        # TODO: Send an email here.
         $resultObj.ProvisioningSuccessful = $true
         $resultObj.Error = "$MailboxLocation mailbox provisioned."
         return $resultObj
     } # end 'PROCESS{}'
 
-# This section executes only once, after the pipeline.
+    # This section executes only once, after the pipeline.
     END {
         Write-Verbose "Cleaning up"
     } # end 'END{}'
