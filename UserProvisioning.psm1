@@ -1,7 +1,7 @@
 ################################################################################
-# 
+#
 # DESCRIPTION:  Provisions resources in Exchange for JMU
-# 
+#
 # Copyright (c) 2009-2011 Seth Wright <wrightst@jmu.edu>
 #
 # Permission to use, copy, modify, and distribute this software for any
@@ -22,7 +22,7 @@ function Add-ProvisionedMailbox {
     [CmdletBinding(SupportsShouldProcess=$true,
             ConfirmImpact="High")]
 
-    param ( 
+    param (
             [Parameter(Mandatory=$true,
                 ValueFromPipeline=$true)]
             [ValidateNotNullOrEmpty()]
@@ -109,7 +109,7 @@ function Add-ProvisionedMailbox {
         Write-Verbose "Initialization complete."
     } # end 'BEGIN{}'
 
-    
+
     # This section executes for each object in the pipeline.
     PROCESS {
         Write-Verbose "Beginning provisioning process for `"$Identity`""
@@ -124,7 +124,7 @@ function Add-ProvisionedMailbox {
             ProvisioningSuccessful  = $false
             Error                   = $null
         }
-            
+
         $User = $null
         try {
             Write-Verbose "Using Domain Controller $dc"
@@ -151,7 +151,7 @@ function Add-ProvisionedMailbox {
             return $resultObj
         }
 
-        # There is no sense in processing a UserMailbox if "Local" 
+        # There is no sense in processing a UserMailbox if "Local"
         # was specified, since it already has a mailbox.
         if ($User.RecipientTypeDetails -eq 'UserMailbox' -and $MailboxLocation -eq 'Local') {
             $resultObj.ProvisioningSuccessful = $true
@@ -161,7 +161,7 @@ function Add-ProvisionedMailbox {
             return $resultObj
         }
 
-        # Another condition that doesn't make sense:  a MailUser getting a 
+        # Another condition that doesn't make sense:  a MailUser getting a
         # "Remote" mailbox.
         if ($User.RecipientTypeDetails -eq 'MailUser' -and $MailboxLocation -eq 'Remote') {
             $resultObj.ProvisioningSuccessful = $true
@@ -206,7 +206,7 @@ function Add-ProvisionedMailbox {
         if ([String]::IsNullOrEmpty($ExternalEmailAddress) -eq $false) {
             $savedAttributes["ExternalEmailAddress"] = $ExternalEmailAddress
         }
-        
+
         # Save some attributes that tend to get blanked out.
         if ($User.RecipientTypeDetails -eq 'MailUser' -or
             $User.RecipientTypeDetails -eq 'UserMailbox') {
@@ -253,7 +253,7 @@ function Add-ProvisionedMailbox {
         }
 
         if ($User.RecipientTypeDetails -eq 'MailUser') {
-            # MailUser --> UserMailbox:  user must first be disabled as a 
+            # MailUser --> UserMailbox:  user must first be disabled as a
             # MailUser, then it can be enabled as a mailbox.
             Write-Verbose "Disabling $username as a MailUser"
 
@@ -274,7 +274,7 @@ function Add-ProvisionedMailbox {
             $User = Get-User -Identity $username -DomainController $dc -ErrorAction Stop
             $resultObj.EndingState = $User.RecipientTypeDetails
 
-            # Since this user will become a UserMailbox, a MailContact needs 
+            # Since this user will become a UserMailbox, a MailContact needs
             # to be created to preserve their current routing information.
             $createContact = $true
         } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
@@ -287,7 +287,7 @@ function Add-ProvisionedMailbox {
         if ($createContact -eq $true)
         {
             Write-Verbose "Creating MailContact for $username"
-            
+
             $contact = Get-MailContact -Identity "$($username)-mc" `
                             -DomainController $dc `
                             -ErrorAction SilentlyContinue
@@ -365,12 +365,12 @@ function Add-ProvisionedMailbox {
         }
 
         # At this point, the following should be true:
-        # * If "Local" was specified--no matter what type the object was as 
+        # * If "Local" was specified--no matter what type the object was as
         #   the start--then the object will be enabled as a UserMailbox.
-        #   
-        # * If "Remote" was specified and the object is a UserMailbox, a 
+        #
+        # * If "Remote" was specified and the object is a UserMailbox, a
         #   MailContact has been created and that's all that needs to happen.
-        #   
+        #
         # * If "Remote" was specified and the object is a User, the object will
         #   be enabled as a MailUser.
 
@@ -421,7 +421,7 @@ function Add-ProvisionedMailbox {
         $cmd += "-Identity $Identity -DomainController $dc "
 
         foreach ($key in $savedAttributes.Keys) {
-            if ($key -eq 'LegacyExchangeDN' -or 
+            if ($key -eq 'LegacyExchangeDN' -or
                 $key -eq 'ExternalEmailAddress' -or
                 [String]::IsNullOrEmpty($savedAttributes[$key])) {
                 continue
