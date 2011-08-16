@@ -51,6 +51,34 @@ function Add-ProvisionedMailbox {
             $SendEmailNotification=$true,
 
             [Parameter(Mandatory=$false)]
+            [ValidateScript({ (Test-Path $_) })]
+            # The path to a file containing the template used to send the "welcome" email to
+            # a user who receives a local mailbox.
+            [string]
+            $LocalWelcomeEmailTemplate,
+
+            [Parameter(Mandatory=$false)]
+            [ValidateScript({ (Test-Path $_) })]
+            # The path to a file containing the template used to send the "welcome" email to
+            # a user who receives a remote mailbox.
+            [string]
+            $RemoteWelcomeEmailTemplate,
+
+            [Parameter(Mandatory=$false)]
+            [ValidateScript({ (Test-Path $_) })]
+            # The path to a file containing the template used to send the "notification" email to
+            # a user who receives a local mailbox.
+            [string]
+            $LocalNotificationEmailTemplate,
+
+            [Parameter(Mandatory=$false)]
+            [ValidateScript({ (Test-Path $_) })]
+            # The path to a file containing the template used to send the "notification" email to
+            # a user who receives a remote mailbox.
+            [string]
+            $RemoteNotificationEmailTemplate,
+
+            [Parameter(Mandatory=$false)]
             [string]
             # The domain controller to use for all operations.
             $DomainController,
