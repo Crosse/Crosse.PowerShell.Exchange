@@ -336,11 +336,11 @@ function Add-ProvisionedMailbox {
             $resultObj.MailContactCreated = $true
 
             if ([String]::IsNullOrEmpty($savedAttributes["LegacyExchangeDN"]) -eq $false) {
-                $addr = "X.400:" + $savedAttributes["LegacyExchangeDN"]
+                $addr = "X500:" + $savedAttributes["LegacyExchangeDN"]
 
-                # Only add the X.400 address if it doesn't already exist.
+                # Only add the X500 address if it doesn't already exist.
                 if ($contact.EmailAddresses.Contains($addr) -eq $false) {
-                    Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X.400 address"
+                    Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X500 address"
                     $contact.EmailAddresses.Add($addr)
 
                     try {
@@ -351,13 +351,13 @@ function Add-ProvisionedMailbox {
                                         -ErrorAction Stop
                     } catch {
                         $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
-                        $w += " as an X.400 address to the MailContact for $username.  "
+                        $w += " as an X500 address to the MailContact for $username.  "
                         $w += "You will need to add this manually.  The error was:  $_"
                         Write-Warning $w
                         $resultObj.Error = $w
                     }
                 } else {
-                    Write-Verbose "LegacyExchangeDN already exists as an X.400 address"
+                    Write-Verbose "LegacyExchangeDN already exists as an X500 address"
                 }
 
                 $contact = Get-MailContact -Identity $contact.Identity -DomainController $dc
