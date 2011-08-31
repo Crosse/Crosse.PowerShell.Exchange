@@ -223,7 +223,7 @@ function Add-ProvisionedMailbox {
             if ($User.RecipientTypeDetails -eq 'MailUser') {
                 # Attributes that only MailUsers have.
                 $savedAttributes["ExternalEmailAddress"] = $User.ExternalEmailAddress
-                $savedAttributes["LegacyExchangeDN"] = $User.LegacyExchangeDN
+                $savedAttributes["LegacyExchangeDN"] = (Get-MailUser $User.DistinguishedName).LegacyExchangeDN
             }
 
             # Attributes that both MailUsers and UserMailboxes have.
@@ -318,6 +318,7 @@ function Add-ProvisionedMailbox {
                     # TODO:  Remove the JMU-specific "(Dukes)" bit in the DisplayName.
                     # I don't know what to replace it with, though.  "(External)"?
                     # Also, -FirstName and -LastName don't exist for Set-MailContact.  WTF?
+                    Write-Verbose "Updating MailContact attributes"
                     Set-MailContact -Identity "$($username)-mc" `
                         -Name "$($username)-mc" `
                         -Alias "$($username)-mc" `
@@ -336,7 +337,12 @@ function Add-ProvisionedMailbox {
             $resultObj.MailContactCreated = $true
 
             if ([String]::IsNullOrEmpty($savedAttributes["LegacyExchangeDN"]) -eq $false) {
-                $addr = "X500:" + $savedAttributes["LegacyExchangeDN"]
+                # NOTE:  The "X" is lower-case on purpose in order to make 
+                # it a secondary address.
+                # Not that, you know, it works.  But it should.  As soon as
+                # I add the address to the collection, it forces it to be a
+                # primary address, and it won't change it back.
+                $addr = "x500:" + $savedAttributes["LegacyExchangeDN"]
 
                 # Only add the X500 address if it doesn't already exist.
                 if ($contact.EmailAddresses.Contains($addr) -eq $false) {
@@ -344,11 +350,11 @@ function Add-ProvisionedMailbox {
                     $contact.EmailAddresses.Add($addr)
 
                     try {
-                        $contact = Set-MailContact `
-                                        -Identity $contact.Identity `
-                                        -EmailAddresses $contact.EmailAddresses `
-                                        -DomainController $dc `
-                                        -ErrorAction Stop
+                        Write-Verbose "Attempting to set new EmailAddresses for user"
+                        Set-MailContact -Identity $contact.Identity `
+                            -EmailAddresses $contact.EmailAddresses `
+                            -DomainController $dc `
+                            -ErrorAction Stop
                     } catch {
                         $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
                         $w += " as an X500 address to the MailContact for $username.  "
@@ -360,7 +366,11 @@ function Add-ProvisionedMailbox {
                     Write-Verbose "LegacyExchangeDN already exists as an X500 address"
                 }
 
-                $contact = Get-MailContact -Identity $contact.Identity -DomainController $dc
+                if ($contact -ne $null) {
+                    $contact = Get-MailContact -Identity $contact.Identity -DomainController $dc
+                }
+            } else {
+                Write-Verbose "Did not find a LegacyExchangeDN for user"
             }
         }
 
