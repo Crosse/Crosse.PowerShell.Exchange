@@ -6,7 +6,7 @@ function ConnectTo-Exchange {
             [string]
             $ConnectionUri,
 
-            [PSCredential]
+            [System.Management.Automation.PSCredential]
             [ValidateNotNull()]
             $Credential = $(Get-Credential),
 
@@ -15,34 +15,54 @@ function ConnectTo-Exchange {
 
             [ValidateNotNullOrEmpty()]
             [string]
-            $Authentication
+            $Authentication,
+
+            [switch]
+            $ImportSession
           )
 
     Write-Verbose "Connecting to $ConnectionUri"
     $error.Clear()
-    $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $ConnectionUri -Credential $Credential -Authentication $Authentication -AllowRedirection:$AllowRedirection
-    if ([String]::IsNullOrEmpty($error[0]) -or $session -ne $null) {
+    $session = New-PSSession    -ConfigurationName Microsoft.Exchange `
+                                -ConnectionUri $ConnectionUri `
+                                -Credential $Credential `
+                                -Authentication $Authentication `
+                                -AllowRedirection:$AllowRedirection `
+                                -Verbose:$false
+
+    if ([String]::IsNullOrEmpty($error[0]) -and $session -ne $null) {
         Write-Verbose "Connection successful."
-        Import-PSSession $session -AllowClobber
+        if ($ImportSession) {
+            Write-Verbose "Importing session"
+            Import-PSSession $session -AllowClobber
+        }
     } else {
         Write-Error "Connection unsuccessful.  $($error[0])"
     }
+
+    $session
 }
 
 function ConnectTo-LiveAtEdu {
+    [CmdletBinding()]
     param (
-            [Parameter(Mandatory=$true)]
             [ValidateNotNullOrEmpty()]
             [string]
             $ConnectionUri = "https://ps.outlook.com/PowerShell",
 
-            [PSCredential]
             [ValidateNotNull()]
+            [System.Management.Automation.PSCredential]
             $Credential = $(Get-Credential),
 
             [switch]
-            $AllowRedirection=$true
+            $AllowRedirection=$true,
+
+            [switch]
+            $ImportSession
           )
 
-    ConnectTo-Exchange @PSBoundParameters -Authentication Basic
+    ConnectTo-Exchange  -ConnectionUri $ConnectionUri `
+                        -Credential $Credential `
+                        -AllowRedirection:$AllowRedirection `
+                        -Authentication Basic `
 }
