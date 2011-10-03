@@ -1,14 +1,14 @@
 function ConnectTo-Exchange {
     [CmdletBinding()]
     param (
+            [System.Management.Automation.PSCredential]
+            [ValidateNotNull()]
+            $Credential = $(Get-Credential),
+
             [Parameter(Mandatory=$true)]
             [ValidateNotNullOrEmpty()]
             [string]
             $ConnectionUri,
-
-            [System.Management.Automation.PSCredential]
-            [ValidateNotNull()]
-            $Credential = $(Get-Credential),
 
             [switch]
             $AllowRedirection=$true,
@@ -28,7 +28,8 @@ function ConnectTo-Exchange {
                                 -Credential $Credential `
                                 -Authentication $Authentication `
                                 -AllowRedirection:$AllowRedirection `
-                                -Verbose:$false
+                                -Verbose:$false `
+                                -Name $Name
 
     if ([String]::IsNullOrEmpty($error[0]) -and $session -ne $null) {
         Write-Verbose "Connection successful."
@@ -39,8 +40,7 @@ function ConnectTo-Exchange {
     } else {
         Write-Error "Connection unsuccessful.  $($error[0])"
     }
-
-    $session
+    return $session
 }
 
 function ConnectTo-LiveAtEdu {
@@ -58,11 +58,32 @@ function ConnectTo-LiveAtEdu {
             $AllowRedirection=$true,
 
             [switch]
-            $ImportSession
+            $ImportSession=$true
           )
 
-    ConnectTo-Exchange  -ConnectionUri $ConnectionUri `
-                        -Credential $Credential `
-                        -AllowRedirection:$AllowRedirection `
-                        -Authentication Basic `
+    $session = ConnectTo-Exchange `
+                    -ConnectionUri $ConnectionUri `
+                    -Credential $Credential `
+                    -AllowRedirection:$AllowRedirection `
+                    -Authentication Basic
+
+    if ($session -ne $null) {
+        $session.Name = "Live@edu"
+
+        if ((Test-Path Function:\Add-ShellType) -eq $true) {
+            Add-ShellType "Live@edu"
+        }
+
+        if ($ImportSession) {
+            Import-Session $session
+        }
+    }
+}
+
+function Disconnect-LiveAtEdu {
+    Get-PSSession | ? { $_.Name -match 'Live@edu' } | Remove-PSSession
+
+    if ((Test-Path Function:\Remove-ShellType) -eq $true) {
+        Remove-ShellType "Live@edu"
+    }
 }
