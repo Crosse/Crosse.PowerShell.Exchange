@@ -1,4 +1,4 @@
-function ConnectTo-Exchange {
+function Connect-ToExchange {
     [CmdletBinding()]
     param (
             [System.Management.Automation.PSCredential]
@@ -43,7 +43,7 @@ function ConnectTo-Exchange {
     return $session
 }
 
-function ConnectTo-LiveAtEdu {
+function Connect-ToLiveAtEdu {
     [CmdletBinding()]
     param (
             [ValidateNotNullOrEmpty()]
