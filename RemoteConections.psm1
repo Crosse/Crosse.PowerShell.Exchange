@@ -61,7 +61,7 @@ function Connect-ToLiveAtEdu {
             $ImportSession=$true
           )
 
-    $session = ConnectTo-Exchange `
+    $session = Connect-ToExchange `
                     -ConnectionUri $ConnectionUri `
                     -Credential $Credential `
                     -AllowRedirection:$AllowRedirection `
