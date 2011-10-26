@@ -3,16 +3,19 @@ function Get-RedirectRuleInformation {
             [Parameter(Mandatory=$true,
                 ValueFromPipeline=$true)]
             [ValidateNotNullOrEmpty()]
-            [string]
+            [object]
             $Identity
           )
 
     PROCESS {
-        $mailbox = Get-Mailbox $Identity 
-
-        if ($mailbox -eq $null) {
-            Write-Error "$Identity does not have a mailbox"
-            return
+        if ($Identity.GetType() -eq [Microsoft.Exchange.Data.Directory.Management.Mailbox]) {
+            $mailbox = $Identity
+        } else {
+            $mailbox = Get-Mailbox $Identity
+            if ($mailbox -eq $null) {
+                Write-Error "$Identity does not have a mailbox"
+                return
+            }
         }
 
         $rules = Get-InboxRule -Mailbox $Identity
@@ -28,7 +31,7 @@ function Get-RedirectRuleInformation {
         foreach ($rule in $rules) { 
             if ($rule.Enabled -eq $true -and $rule.RedirectTo -ne $null) { 
                 foreach ($redirect in $rule.RedirectTo) {
-                    $redirectTo = $redirect.Replace("`"", "'")
+                    $redirectTo = $redirect.Address
                 }
             } 
         } 
