@@ -94,14 +94,16 @@ function Add-ProvisionedMailbox {
             $RemoteNotificationEmailTemplate,
 
             [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
             [string]
             # The domain controller to use for all operations.
             $DomainController,
 
             [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
             [string]
             # Where to create MailContact objects, if necessary.
-            $MailContactOrganizationalUnit="Users"
+            $MailContactOrganizationalUnit="ExchangeObjects/MailContacts"
         )
 
     # This section executes only once, before the pipeline.
