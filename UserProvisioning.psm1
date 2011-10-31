@@ -45,7 +45,7 @@ function Add-ProvisionedMailbox {
             # The external address (targetAddress) to assign to the MailUser.
             $ExternalEmailAddress,
 
-            [Parameter(Mandatory=$false,
+            [Parameter(Mandatory=$true,
                 ParameterSetName="Lync",
                 ValueFromPipelineByPropertyName=$true)]
             [switch]
@@ -484,14 +484,21 @@ function Add-ProvisionedMailbox {
         # Enable the user for Lync, if specified.
         if ($MailboxLocation -eq "Local" -and $EnableForLync -eq $true) {
             try {
-                Write-Verbose "Enabling $username in Lync on $LyncRegistrarPool"
-                $result = Enable-CsUser -Identity $username `
-                            -RegistrarPool $LyncRegistrarPool `
-                            -SipAddressType EmailAddress `
-                            -PassThru `
-                            -DomainController $dc `
-                            -ErrorAction Stop
+                $result = Get-CsUser -Identity $username `
+                                -DomainController $dc `
+                                -ErrorAction SilentlyContinue
+                if ($result -eq $null) {
+                    Write-Verbose "Enabling $username in Lync on $LyncRegistrarPool"
+                    $result = Enable-CsUser -Identity $username `
+                                -RegistrarPool $LyncRegistrarPool `
+                                -SipAddressType EmailAddress `
+                                -PassThru `
+                                -DomainController $dc `
+                                -ErrorAction Stop
 
+                } else {
+                    Write-Verbose "User $username is already enabled in Lync."
+                }
             } catch {
                 $err = "An error occurred while running Enable-CsUser:  $_"
                 Write-Error $err
@@ -499,6 +506,8 @@ function Add-ProvisionedMailbox {
                 return $resultObj
             }
 
+            # If we got here, the user was either enabled in Lync or was
+            # already enabled in Lync before now.
             $resultObj.EnabledForLync = $true
         }
 
