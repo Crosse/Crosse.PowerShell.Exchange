@@ -114,7 +114,7 @@ function Add-ProvisionedMailbox {
 
             if ($dc -eq $null) {
                 Write-Error "Could not find a domain controller to use for the operation."
-                return
+                continue
             }
         } else {
             $dc = $DomainController
