@@ -45,21 +45,6 @@ function Add-ProvisionedMailbox {
             # The external address (targetAddress) to assign to the MailUser.
             $ExternalEmailAddress,
 
-            [Parameter(Mandatory=$true,
-                ParameterSetName="Lync",
-                ValueFromPipelineByPropertyName=$true)]
-            [switch]
-            # Specifies whether the user will also be enabled in Lync.
-            $EnableForLync=$false,
-
-            [Parameter(Mandatory=$true,
-                ParameterSetName="Lync",
-                ValueFromPipelineByPropertyName=$true)]
-            [ValidateNotNullOrEmpty()]
-            [string]
-            # The Lync registrar pool to which to assign the user.
-            $LyncRegistrarPool,
-
             [Parameter(Mandatory=$false)]
             [switch]
             # Specifies whether or not email notifications will be sent about the new mailbox.
@@ -124,20 +109,6 @@ function Add-ProvisionedMailbox {
 
         Write-Verbose "Using Domain Controller $dc"
         Write-Verbose "Initialization complete."
-
-        $lyncModule = Get-Module -Name Lync
-        if ($lyncModule -eq $null) {
-            Write-Verbose "Attempting to load Lync module"
-            $lyncModule = Import-Module -PassThru -Name Lync -Verbose:$false
-            if ($lyncModule -eq $null) {
-                Write-Error "Lync module not loaded, and not found on this system."
-                continue
-            } else {
-                Write-Verbose "Loaded Lync module."
-            }
-        } else {
-            Write-Verbose "Found already-loaded Lync module."
-        }
     } # end 'BEGIN{}'
 
     # This section executes for each object in the pipeline.
@@ -150,7 +121,6 @@ function Add-ProvisionedMailbox {
             OriginalState           = $null
             EndingState             = $null
             MailContactCreated      = $false
-            EnabledForLync          = $false
             EmailSent               = $false
             ProvisioningSuccessful  = $false
             Error                   = $null
@@ -481,36 +451,6 @@ function Add-ProvisionedMailbox {
             Write-Error $err
             $resultObj.Error = $err
             return $resultObj
-        }
-
-        # Enable the user for Lync, if specified.
-        if ($MailboxLocation -eq "Local" -and $EnableForLync -eq $true) {
-            try {
-                $result = Get-CsUser -Identity $username `
-                                -DomainController $dc `
-                                -ErrorAction SilentlyContinue
-                if ($result -eq $null) {
-                    Write-Verbose "Enabling $username in Lync on $LyncRegistrarPool"
-                    $result = Enable-CsUser -Identity $username `
-                                -RegistrarPool $LyncRegistrarPool `
-                                -SipAddressType EmailAddress `
-                                -PassThru `
-                                -DomainController $dc `
-                                -ErrorAction Stop
-
-                } else {
-                    Write-Verbose "User $username is already enabled in Lync."
-                }
-            } catch {
-                $err = "An error occurred while running Enable-CsUser:  $_"
-                Write-Error $err
-                $resultObj.Error = $err
-                return $resultObj
-            }
-
-            # If we got here, the user was either enabled in Lync or was
-            # already enabled in Lync before now.
-            $resultObj.EnabledForLync = $true
         }
 
         # Send emails where appropriate.
