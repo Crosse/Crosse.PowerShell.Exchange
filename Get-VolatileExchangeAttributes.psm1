@@ -66,7 +66,6 @@ function Get-VolatileExchangeAttributes {
         } catch {
             $err = "$Identity is not a valid user in Active Directory:  ($_)."
             Write-Error $err
-            $resultObj.Error = $err
             return $resultObj
         }
         Write-Verbose "Found user $User in Active Directory"
@@ -87,7 +86,7 @@ function Get-VolatileExchangeAttributes {
             $User.RecipientTypeDetails -eq 'UserMailbox') {
 
             try {
-                $User = Get-Recipient $username -DomainController $dc -ErrorAction Stop
+                $User = Get-Recipient -Identity $User -DomainController $dc -ErrorAction Stop
             } catch {
                 $err = "Could not perform Get-Recipient on $username:  $_"
                 Write-Error $err
