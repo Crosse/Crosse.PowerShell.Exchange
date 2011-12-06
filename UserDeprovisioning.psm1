@@ -18,7 +18,7 @@
 #
 ################################################################################
 
-function Remove-ProvisionedMailbox {
+function Disable-ProvisionedMailbox {
     [CmdletBinding(SupportsShouldProcess=$true,
             ConfirmImpact="High")]
 
@@ -36,14 +36,6 @@ function Remove-ProvisionedMailbox {
             [string]
             # Should be either "Local" or "Remote"
             $MailboxLocation,
-
-            [Parameter(Mandatory=$false,
-                ParameterSetName="MailUser",
-                ValueFromPipelineByPropertyName=$true)]
-            [ValidateNotNullOrEmpty()]
-            [string]
-            # The external address (targetAddress) to assign to the MailUser.
-            $ExternalEmailAddress,
 
             [Parameter(Mandatory=$false)]
             [switch]
@@ -117,43 +109,63 @@ function Remove-ProvisionedMailbox {
         $resultObj.EndingState = $User.RecipientTypeDetails
 
         # We don't process disabled users, at least not right now.
-#        if ($User.RecipientTypeDetails -eq 'DisabledUser') {
-#            $err = "User is disabled in Active Directory.  Not performing any operations."
-#            Write-Error $err
-#            $resultObj.Error = $err
-#            return $resultObj
-#        }
-
-        # If 'Local' is specified, the user should have a local mailbox.
-        if ($MailboxLocation -eq 'Local' -and $User.RecipientTypeDetails -ne 'UserMailbox') {
-            $resultObj.DeprovisioningSuccessful = $true
-            $err = "$username does not have a local mailbox to remove."
-            Write-Error $err
+        if ($User.RecipientTypeDetails -eq 'DisabledUser') {
+            $err = "User is disabled.  This may not work."
+            Write-Warning $err
             $resultObj.Error = $err
-            return $resultObj
         }
 
-        # If 'Remote' is specified, the user should have a remote mailbox.
-        if ($MailboxLocation -eq 'Remote' -and $User.RecipientTypeDetails -ne 'MailUser') {
-            $resultObj.DeprovisioningSuccessful = $true
-            $err = "$username does not have a remote mailbox to remove."
-            Write-Error $err
-            $resultObj.Error = $err
-            return $resultObj
+        # Find out if the user has a MailContact object.
+        $contact = Get-MailContact -Identity "$($username)-mc" `
+                        -DomainController $dc `
+                        -ErrorAction SilentlyContinue
+        if ($contact -ne $null) {
+            Write-Verbose "Found MailContact object $($contact.Alias) for user $username"
         }
 
+        if ($MailboxLocation -eq 'Local') {
+            if ($User.RecipientTypeDetails -eq 'UserMailbox') {
+                Write-Verbose "Requesting removal of local mailbox for UserMailbox $username"
+            } else {
+                # If 'Local' is specified, the user should have a local mailbox.
+                $err = "$username does not have a local mailbox to remove."
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
+            }
+        } elseif ($MailboxLocation -eq 'Remote') {
+            if ($User.RecipientTypeDetails -eq 'MailUser') {
+                # If the user is a MailUser, we'll be disabling them as
+                # such.
+                Write-Verbose "Requesting removal of remote mailbox for MailUser $username"
+            }
+
+            if ($contact -ne $null) {
+                Write-Verbose "Requesting removal of MailContact object for $username"
+            } else {
+                if ($User.RecipientTypeDetails -ne 'MailUser') { 
+                    $err = "$username does not have a remote mailbox to remove."
+                    Write-Error $err
+                    $resultObj.Error = $err
+                    return $resultObj
+                }
+            }
+        }
 
         # TODO: Fix these comments.
         # After this, the following statements should be true:
-        #  If the object is a User, either "Local" or "Remote" can be specified.
-        #  If the object is a MailUser, then "Local" was specified.
-        #  If the object is a UserMailbox, then "Remote" was specified.
+        #  If the object is a User, there's nothing to do but cleanup a
+        #  MailContact, if one exists.
 
         $desc = "Deprovision $MailboxLocation Mailbox for `"$username`""
         $caption = $desc
         $warning = "Are you sure you want to perform this action?`n"
         $warning += "This will remove the $($MailboxLocation.ToLower()) "
         $warning += "mailbox for user `"$username`"."
+        if ($MailboxLocation -eq 'Remote') {
+            $warning += "`n`nThis will NOT remove the remote mailbox, "
+            $warning += "only the reference to the mailbox in the on-premise GAL."
+        }
 
         if (!$PSCmdlet.ShouldProcess($desc, $warning, $caption)) {
             $resultObj.Error = "User cancelled the operation."
@@ -214,14 +226,14 @@ function Remove-ProvisionedMailbox {
         }
 
         try {
-            if ($User.RecipientTypeDetails -eq 'MailUser') {
+            if ($MailboxLocation -eq 'Remote' -and $User.RecipientTypeDetails -eq 'MailUser') {
                 Write-Verbose "Disabling $username as a MailUser"
                 Disable-MailUser `
                     -Identity $username `
                     -DomainController $dc `
                     -Confirm:$false `
                     -ErrorAction Stop
-            } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
+            } elseif ($MailboxLocation -eq 'Local' -and $User.RecipientTypeDetails -eq 'UserMailbox') {
                 Write-Verbose "Disabling $username as a UserMailbox"
                 Disable-Mailbox `
                     -Identity $username `
@@ -230,7 +242,7 @@ function Remove-ProvisionedMailbox {
                     -ErrorAction Stop
             }
         } catch {
-            $err = "Could not run Disable-Mailbox/Disable-Mailuser for user $username ($_)."
+            $err = "Could not run Disable-Mailbox/Disable-MailUser for user $username ($_)."
             Write-Error $err
             $resultObj.Error = $err
             return $resultObj
@@ -240,180 +252,92 @@ function Remove-ProvisionedMailbox {
         $User = Get-User -Identity $username -DomainController $dc -ErrorAction Stop
         $resultObj.EndingState = $User.RecipientTypeDetails
 
-        # If a mail contact object exists for the user, it should be deleted
-        # the user should become a MailUser with that information.
-        $contact = Get-MailContact -Identity "$($username)-mc" `
-                        -DomainController $dc `
-                        -ErrorAction SilentlyContinue
-
-        if ($contact -eq $null) {
-            Write-Verbose "No MailContact exists for $username"
-        } else {
+        if ($contact -ne $null) {
             # Save some relevant attributes.
             $mcExternalEmailAddress = $contact.ExternalEmailAddress
             $mcEmailAddresses = $contact.EmailAddresses
 
+            Write-Verbose "MailContact's ExternalEmailAddress: $mcExternalEmailAddress"
+            Write-Verbose "MailContact's EmailAddresses: $mcEmailAddresses"
+
             try {
+                Write-Verbose "Removing MailContact object $($contact.Alias)"
                 Remove-MailContact `
-                    -Identity "$($username)-mc)"
+                    -Identity "$($username)-mc" `
                     -DomainController $dc `
+                    -Confirm:$Confirm `
                     -ErrorAction Stop
             } catch {
-                $err =  "Could not remote contact for $username.  The error was:  $_"
+                $err =  "Could not remove contact for $username.  The error was:  $_"
                 Write-Error $err
                 $resultObj.Error = $_
                 return $resultObj
             }
-        }
 
-        $resultObj.MailContactRemoved = $true
+            $resultObj.MailContactRemoved = $true
 
-        if ([String]::IsNullOrEmpty($savedAttributes["LegacyExchangeDN"]) -eq $false) {
-            # NOTE:  The "X" is lower-case on purpose in order to make 
-            # it a secondary address.
-            # Not that, you know, it works.  But it should.  As soon as
-            # I add the address to the collection, it forces it to be a
-            # primary address, and it won't change it back.
-            $addr = "x500:" + $savedAttributes["LegacyExchangeDN"]
-
-            # Only add the X500 address if it doesn't already exist.
-            if ($contact.EmailAddresses.Contains($addr) -eq $false) {
-                Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X500 address"
-                $contact.EmailAddresses.Add($addr)
+            if ($User.RecipientTypeDetails -eq 'User' -and $MailboxLocation -eq 'Local') {
+                # ...which it should...
+                Write-Verbose "Enabling $username as a MailUser"
 
                 try {
-                    Write-Verbose "Attempting to set new EmailAddresses for user"
-                    Set-MailContact -Identity $contact.Identity `
-                        -EmailAddresses $contact.EmailAddresses `
-                        -DomainController $dc `
-                        -ErrorAction Stop
+                    $User = Enable-MailUser `
+                                -Identity $username `
+                                -ExternalEmailAddress $mcExternalEmailAddress `
+                                -DomainController $dc `
+                                -ErrorAction Stop
                 } catch {
-                    $w = "An error occurred while adding " + $savedAttributes["LegacyExchangeDN"]
-                    $w += " as an X500 address to the MailContact for $username.  "
-                    $w += "You will need to add this manually.  The error was:  $_"
-                    Write-Warning $w
-                    $resultObj.Error = $w
+                    $err = "An error occurred while running Enable-MailUser:  $_"
+                    Write-Error $err
+                    $resultObj.Error = $err
+                    return $resultObj
                 }
-            } else {
-                Write-Verbose "LegacyExchangeDN already exists as an X500 address"
-            }
 
-            if ($contact -ne $null) {
-                $contact = Get-MailContact -Identity $contact.Identity -DomainController $dc
-            }
-        } else {
-            Write-Verbose "Did not find a LegacyExchangeDN for user"
-        }
+                # TODO:  Handle removal of @jmu.edu addresses.
+                $emailAddresses = $User.EmailAddresses
+                foreach ($address in $contact.EmailAddresses) {
+                    if ($address.PrefixString -match 'X500') {
+                        if ($address.AddressString -eq $User.LegacyExchangeDN) {
+                            Write-Verbose "LegacyExchangeDN is already correct"
+                        } else {
+                            $emailAddresses += $address
+                        }
+                    }
+                }
 
-        # At this point, the following should be true:
-        # * If "Local" was specified--no matter what type the object was as
-        #   the start--then the object will be enabled as a UserMailbox.
-        #
-        # * If "Remote" was specified and the object is a UserMailbox, a
-        #   MailContact has been created and that's all that needs to happen.
-        #
-        # * If "Remote" was specified and the object is a User, the object will
-        #   be enabled as a MailUser.
-
-        if ($MailboxLocation -eq 'Local') {
-            # Enable as UserMailbox.
-            Write-Verbose "Enabling $username as a UserMailbox"
-
-            try {
-                # TODO:  Remove the JMU-specific bit about the ManagedFolderMailboxPolicy.
-                $User = Enable-Mailbox `
-                            -Identity $username `
-                            -ManagedFolderMailboxPolicy "Default Managed Folder Policy" `
-                            -ManagedFolderMailboxPolicyAllowed:$true `
-                            -DomainController $dc `
-                            -ErrorAction Stop
-            } catch {
-                $err =  "An error occurred while running Enable-Mailbox.  The error was: $_"
-                Write-Error $err
-                $resultObj.Error = $err
-                return $resultObj
-            }
-        } elseif ($MailboxLocation -eq 'Remote' -and $User.RecipientTypeDetails -eq 'User') {
-            # Enable as MailUser.
-            Write-Verbose "Enabling $username as a MailUser"
-
-            try {
-                $User = Enable-MailUser `
-                            -Identity $username `
-                            -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
-                            -DomainController $dc `
-                            -ErrorAction Stop
-            } catch {
-                $err = "An error occurred while running Enable-MailUser:  $_"
-                Write-Error $err
-                $resultObj.Error = $err
-                return $resultObj
+                $resultObj.EndingState = $User.RecipientTypeDetails
             }
         }
-
-        $resultObj.EndingState = $User.RecipientTypeDetails
 
         # Reapply any saved attributes.
         if ($User.RecipientTypeDetails -eq 'MailUser') {
-            $cmd = "Set-MailUser "
-        } elseif ($User.RecipientTypeDetails -eq 'UserMailbox') {
-            $cmd = "Set-Mailbox "
-        }
-        $cmd += "-Identity $Identity -DomainController $dc "
+            $cmd = "Set-MailUser -Identity $Identity -DomainController $dc -ErrorAction Stop "
+            $cmd += " -EmailAddresses `$emailAddresses "
 
-        foreach ($key in $savedAttributes.Keys) {
-            if ($key -eq 'LegacyExchangeDN' -or
-                $key -eq 'ExternalEmailAddress' -or
-                [String]::IsNullOrEmpty($savedAttributes[$key])) {
-                continue
-            }
-            $cmd += "-$($key) `"$($savedAttributes[$key])`" "
-        }
-        $cmd += "-ErrorAction Stop"
-
-        Write-Verbose "Reapplying saved attributes"
-
-        try {
-            Write-Debug "Executing command `"$cmd`""
-            Invoke-Expression $cmd
-        } catch {
-            $err =  "An error occurred while reapplying saved attributes.  The error was: $_"
-            Write-Error $err
-            $resultObj.Error = $err
-            return $resultObj
-        }
-
-        # Send emails where appropriate.
-        if ($SendEmailNotification -eq $true) {
-            $welcomeEmail = $null
-            $notifyEmail = $null
-
-            if ($MailboxLocation -eq "Local") {
-                $welcomeEmail = $User.PrimarySmtpAddress
-                if ($contact -ne $null) {
-                    $notifyEmail = $contact.ExternalEmailAddress
+            foreach ($key in $savedAttributes.Keys) {
+                if ($key -eq 'LegacyExchangeDN' -or
+                    $key -eq 'ExternalEmailAddress' -or
+                    [String]::IsNullOrEmpty($savedAttributes[$key])) {
+                    continue
                 }
-            } elseif ($MailboxLocation -eq "Remote") {
-                if ($contact -eq $null) {
-                    $welcomeEmail = $User.ExternalEmailAddress
-                } else {
-                    $welcomeEmail = $contact.ExternalEmailAddress
-                    $notifyEmail = $User.PrimarySmtpAddress
-                }
+                $cmd += "-$($key) `"$($savedAttributes[$key])`" "
             }
 
-            if ($welcomeEmail -ne $null) {
-                Write-Verbose "Sending Welcome email to $welcomeEmail"
+            Write-Verbose "Reapplying saved attributes"
+
+            try {
+                Write-Debug "Executing command `"$cmd`""
+                Invoke-Expression $cmd
+            } catch {
+                $err =  "An error occurred while reapplying saved attributes.  The error was: $_"
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
             }
-            if ($notifyEmail -ne $null) {
-                Write-Verbose "Sending Notify email to $notifyEmail"
-            }
-        } else {
-            Write-Verbose "Not sending emails"
         }
 
         $resultObj.DeprovisioningSuccessful = $true
-        $resultObj.Error = "$MailboxLocation mailbox provisioned."
+        $resultObj.Error = "$MailboxLocation mailbox deprovisioned."
         return $resultObj
     } # end 'PROCESS{}'
 
