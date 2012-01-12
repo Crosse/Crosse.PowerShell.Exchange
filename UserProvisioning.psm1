@@ -18,6 +18,23 @@
 #
 ################################################################################
 
+################################################################################
+<#
+    .SYNOPSIS
+    Provisions a user with a local or remote mailbox.
+
+    .DESCRIPTION
+    Provisions a user with a local or remote mailbox.  This cmdlet will not actually
+    create a mailbox in a remote Exchange instance (like Office365 or Live@edu),
+    but will set up the user account in the on-premise Exchange correctly.
+
+    .INPUTS
+    System.String.  The Identity to provision.
+
+    .OUTPUTS
+    A PSObject with the results of the provisioning process.
+#>
+################################################################################
 function Add-ProvisionedMailbox {
     [CmdletBinding(SupportsShouldProcess=$true,
             ConfirmImpact="High")]
@@ -34,7 +51,7 @@ function Add-ProvisionedMailbox {
                 ValueFromPipelineByPropertyName=$true)]
             [ValidateSet("Local", "Remote")]
             [string]
-            # Should be either "Local" or "Remote"
+            # Should be either "Local" or "Remote".
             $MailboxLocation,
 
             [Parameter(Mandatory=$false,
@@ -52,30 +69,30 @@ function Add-ProvisionedMailbox {
 
             [Parameter(Mandatory=$false)]
             [ValidateScript({ (Test-Path $_) })]
+            [string]
             # The path to a file containing the template used to send the "welcome" email to
             # a user who receives a local mailbox.
-            [string]
             $LocalWelcomeEmailTemplate,
 
             [Parameter(Mandatory=$false)]
             [ValidateScript({ (Test-Path $_) })]
+            [string]
             # The path to a file containing the template used to send the "welcome" email to
             # a user who receives a remote mailbox.
-            [string]
             $RemoteWelcomeEmailTemplate,
 
             [Parameter(Mandatory=$false)]
             [ValidateScript({ (Test-Path $_) })]
+            [string]
             # The path to a file containing the template used to send the "notification" email to
             # a user who receives a local mailbox.
-            [string]
             $LocalNotificationEmailTemplate,
 
             [Parameter(Mandatory=$false)]
             [ValidateScript({ (Test-Path $_) })]
+            [string]
             # The path to a file containing the template used to send the "notification" email to
             # a user who receives a remote mailbox.
-            [string]
             $RemoteNotificationEmailTemplate,
 
             [Parameter(Mandatory=$false)]
