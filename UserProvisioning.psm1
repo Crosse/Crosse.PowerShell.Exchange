@@ -55,7 +55,6 @@ function Add-ProvisionedMailbox {
             $MailboxLocation,
 
             [Parameter(Mandatory=$false,
-                ParameterSetName="MailUser",
                 ValueFromPipelineByPropertyName=$true)]
             [ValidateNotNullOrEmpty()]
             [string]
@@ -65,9 +64,11 @@ function Add-ProvisionedMailbox {
             [Parameter(Mandatory=$false)]
             [switch]
             # Specifies whether or not email notifications will be sent about the new mailbox.
-            $SendEmailNotification=$true,
+            $SendEmailNotification=$false,
 
             [Parameter(Mandatory=$false)]
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
             [ValidateScript({ (Test-Path $_) })]
             [string]
             # The path to a file containing the template used to send the "welcome" email to
@@ -75,6 +76,7 @@ function Add-ProvisionedMailbox {
             $LocalWelcomeEmailTemplate,
 
             [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
             [ValidateScript({ (Test-Path $_) })]
             [string]
             # The path to a file containing the template used to send the "welcome" email to
@@ -82,6 +84,7 @@ function Add-ProvisionedMailbox {
             $RemoteWelcomeEmailTemplate,
 
             [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
             [ValidateScript({ (Test-Path $_) })]
             [string]
             # The path to a file containing the template used to send the "notification" email to
@@ -89,6 +92,7 @@ function Add-ProvisionedMailbox {
             $LocalNotificationEmailTemplate,
 
             [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
             [ValidateScript({ (Test-Path $_) })]
             [string]
             # The path to a file containing the template used to send the "notification" email to
@@ -241,7 +245,9 @@ function Add-ProvisionedMailbox {
             if ($User.RecipientTypeDetails -eq 'MailUser') {
                 # Attributes that only MailUsers have.
                 $savedAttributes["ExternalEmailAddress"] = $User.ExternalEmailAddress
-                $savedAttributes["LegacyExchangeDN"] = (Get-MailUser $User.DistinguishedName).LegacyExchangeDN
+                $mailUser = Get-MailUser -Identity $User.DistinguishedName `
+                                         -DomainController $dc
+                $savedAttributes["LegacyExchangeDN"] = $mailUser.LegacyExchangeDN
             }
 
             # Attributes that both MailUsers and UserMailboxes have.
