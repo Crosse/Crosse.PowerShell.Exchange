@@ -85,7 +85,7 @@ function Add-ProvisionedMailbox {
             [string]
             # The path to a file containing the template used to send the "welcome" email to
             # a user who receives a local mailbox.
-            $LocalWelcomeEmailTemplate,
+            $LocalWelcomeEmailTemplate = (Join-Path $PSScriptRoot "LocalWelcomeEmailTemplate.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
@@ -93,7 +93,7 @@ function Add-ProvisionedMailbox {
             [string]
             # The path to a file containing the template used to send the "welcome" email to
             # a user who receives a remote mailbox.
-            $RemoteWelcomeEmailTemplate,
+            $RemoteWelcomeEmailTemplate = (Join-Path $PSScriptRoot "RemoteWelcomeEmailTemplate.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
@@ -101,7 +101,7 @@ function Add-ProvisionedMailbox {
             [string]
             # The path to a file containing the template used to send the "notification" email to
             # a user who receives a local mailbox.
-            $LocalNotificationEmailTemplate,
+            $LocalNotificationEmailTemplate = (Join-Path $PSScriptRoot "LocalNotificationEmailTemplate.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
@@ -109,7 +109,7 @@ function Add-ProvisionedMailbox {
             [string]
             # The path to a file containing the template used to send the "notification" email to
             # a user who receives a remote mailbox.
-            $RemoteNotificationEmailTemplate,
+            $RemoteNotificationEmailTemplate = (Join-Path $PSScriptRoot "RemoteNotificationEmailTemplate.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
@@ -152,7 +152,18 @@ function Add-ProvisionedMailbox {
             }
         }
 
-        Add-Type -Path .\Microsoft.Exchange.WebServices.dll
+        $eapref = $ErrorActionPreference
+        $ErrorActionPreference = "SilentlyContinue"
+        $type = Add-Type -PassThru `
+                         -Path "C:\Program Files\Microsoft\Exchange\Web Services\1.1\Microsoft.Exchange.WebServices.dll" `
+        $ErrorActionPreference = $eapref
+        if ($type -eq $null) {
+            $type = Add-Type -PassThru -Path (Join-Path $PSScriptRoot "Microsoft.Exchange.WebServices.dll")
+            if ($type -eq $null) {
+                Write-Error "Cannot find the EWS Managed API assembly!"
+                continue
+            }
+        }
         $service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService "Exchange2010"
 
         Write-Verbose "Using Domain Controller $dc"
@@ -525,11 +536,9 @@ function Add-ProvisionedMailbox {
                 }
 
 
-                Write-Host -NoNewLine "Waiting for user's mailbox to become available"
-                $eapref = $ErrorActionPreference
+                Write-Verbose "Waiting for user's mailbox to become available"
                 $start = Get-Date
                 do {
-                    Write-Host -NoNewLine "."
                     Start-Sleep 1
 
                     if ($service.Url -eq $null) {
@@ -537,16 +546,19 @@ function Add-ProvisionedMailbox {
                         $null = $service.AutodiscoverUrl($welcomeEmailAddress.ToString())
                         $ErrorActionPreference = $eapref
                         if ($service.Url -ne $null) {
-                            Write-Verbose "Autodiscover: $($service.Url)"
+                            Write-Verbose "Found Autodiscover for $User: $($service.Url)"
                         }
                     } else {
-                        $names = $service.ResolveName($welcomeEmailAddress.ToString())
+                        if ($names -eq $null -or $names.Count -eq 0) {
+                            $names = $service.ResolveName($welcomeEmailAddress.ToString())
+                            Write-Verbose "Found $user in GAL via EWS"
+                        }
                         if ($names.Count -gt 0) {
                             $permissions = Get-MailboxPermission -Identity $User `
                                                 -User "NT AUTHORITY\SELF" `
                                                 -DomainController $dc
                             if ($permissions -ne $null) {
-                                Write-Verbose "Mailbox has been created."
+                                Write-Verbose "Mailbox for $user has been created."
                                 break
                             }
                         }
@@ -554,7 +566,9 @@ function Add-ProvisionedMailbox {
 
                     $elapsed = ((Get-Date) - $start).TotalSeconds
                 } while ($elapsed -le 60)
-                Start-Sleep 5
+
+                Write-Verbose "Stalling for 15 seconds to ensure mailbox is available"
+                Start-Sleep 15
 
                 if ($elapsed -gt 60) {
                     Write-Host ""
