@@ -399,7 +399,7 @@ function Add-ProvisionedMailbox {
             $resultObj.MailContactCreated = $true
 
             if ([String]::IsNullOrEmpty($savedAttributes["LegacyExchangeDN"]) -eq $false) {
-                # NOTE:  The "X" is lower-case on purpose in order to make 
+                # NOTE:  The "X" is lower-case on purpose in order to make
                 # it a secondary address.
                 # Not that, you know, it works.  But it should.  As soon as
                 # I add the address to the collection, it forces it to be a
