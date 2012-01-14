@@ -1,0 +1,254 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<helpItems xmlns="http://msh" schema="maml">
+	<command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+		<command:details>
+			<command:name>Add-ProvisionedMailbox</command:name>
+			<command:verb>Add</command:verb>
+			<command:noun>ProvisionedMailbox</command:noun>
+
+			<!-- SYNOPSIS -->
+			<maml:description>
+				<maml:para>Creates a local or remote mailbox for a user or users.</maml:para>
+			</maml:description>
+		</command:details>
+
+		<!-- DESCRIPTION -->
+		<maml:description>
+			<maml:para>
+				The Add-ProvisionedMailbox cmdlet provisions a user with a local or remote mailbox.  The cmdlet will create on-premise mailboxes and enable users as MailUsers as needed.  However, this cmdlet will not actually create a mailbox in a remote Exchange instance (like Office365 or Live@edu) yet.
+			</maml:para>
+		</maml:description>
+
+		<!-- SYNTAX -->
+		<!--
+			Add-ProvisionedMailbox [-Identity] <String> -Local -SendEmailNotification -EmailFrom <SmtpAddress> [-SmtpServer <String>] [-LocalWelcomeEmailTemplate <FileInfo>] [-RemoteWelcomeEmailTemplate <FileInfo>] [-LocalNotificationEmailTemplate <FileInfo>] [-RemoteNotificationEmailTemplate <FileInfo>] [-DomainController <String>]
+			Add-ProvisionedMailbox [-Identity] <String> -Local [-DomainController <String>]
+			Add-ProvisionedMailbox [-Identity] <String> -Remote -ExternalEmailAddress <SmtpAddress> -SendEmailNotification -EmailFrom <SmtpAddress> [-SmtpServer <String>] [-LocalWelcomeEmailTemplate <FileInfo>] [-RemoteWelcomeEmailTemplate <FileInfo>] [-LocalNotificationEmailTemplate <FileInfo>] [-RemoteNotificationEmailTemplate <FileInfo>] [-DomainController <String>]
+			Add-ProvisionedMailbox [-Identity] <String> -Remote -ExternalEmailAddress <SmtpAddress> [-DomainController <String>]
+		-->
+		<command:syntax>
+			<!-- "DefaultParameterSet" ParameterSet -->
+			<command:syntaxItem>
+				<maml:name>Add-ProvisionedMailbox</maml:name>
+
+				<command:parameter required="true" pipelineInput="true (ByValue)" position="1">
+					<maml:name>Identity</maml:name>
+					<command:parameterValue required="true">string</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="true" pipelineInput="true (ByPropertyName)">
+					<maml:name>MailboxLocation</maml:name>
+					<command:parameterValue required="true">MailboxLocation</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="false" pipelineInput="true (ByPropertyName)">
+					<maml:name>ExternalEmailAddress</maml:name>
+					<command:parameterValue required="true">SmtpAddress</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="false">
+					<maml:name>DomainController</maml:name>
+					<command:parameterValue required="true">Fqdn</command:parameterValue>
+				</command:parameter>
+			</command:syntaxItem>
+
+			<!-- "SendEmails" ParameterSet -->
+			<command:syntaxItem>
+				<maml:name>Add-ProvisionedMailbox</maml:name>
+
+				<command:parameter required="true" pipelineInput="true (ByValue)" position="1">
+					<maml:name>Identity</maml:name>
+					<command:parameterValue required="true">string</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="true" pipelineInput="true (ByPropertyName)">
+					<maml:name>MailboxLocation</maml:name>
+					<command:parameterValue required="true">MailboxLocation</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="true">
+					<maml:name>SendEmailNotification</maml:name>
+				</command:parameter>
+
+				<command:parameter required="true">
+					<maml:name>EmailFrom</maml:name>
+					<command:parameterValue required="true">SmtpAddress</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="false" pipelineInput="true (ByPropertyName)">
+					<maml:name>ExternalEmailAddress</maml:name>
+					<command:parameterValue required="true">SmtpAddress</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="false">
+					<maml:name>SmtpServer</maml:name>
+					<command:parameterValue required="true">Fqdn</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="true">
+					<maml:name>LocalWelcomeEmailTemplate</maml:name>
+					<command:parameterValue required="true">FileInfo</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="true">
+					<maml:name>RemoteWelcomeEmailTemplate</maml:name>
+					<command:parameterValue required="true">FileInfo</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="true">
+					<maml:name>LocalNotificationEmailTemplate</maml:name>
+					<command:parameterValue required="true">FileInfo</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="true">
+					<maml:name>RemoteNotificationEmailTemplate</maml:name>
+					<command:parameterValue required="true">FileInfo</command:parameterValue>
+				</command:parameter>
+
+				<command:parameter required="false">
+					<maml:name>DomainController</maml:name>
+					<command:parameterValue required="true">String</command:parameterValue>
+				</command:parameter>
+			</command:syntaxItem>
+		</command:syntax>
+
+		<!-- PARAMETERS -->
+		<command:parameters>
+			<command:parameter required="true" pipelineInput="true (ByValue)" position="1">
+				<maml:name>Identity</maml:name>
+				<maml:description>
+					<maml:para>
+						The Identity parameter specifies the user to be provisioned.  The user must already exist in Active Directory.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">string</command:parameterValue>
+				<dev:type>
+					<maml:name>String</maml:name>
+					<maml:uri/>
+				</dev:type>
+			</command:parameter>
+
+			<command:parameter required="true" pipelineInput="true (ByPropertyName)">
+				<maml:name>MailboxLocation</maml:name>
+				<maml:description>
+					<maml:para>
+						The MailboxLocation parameter specifies the location where the mailbox should be provisioned.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">MailboxLocation</command:parameterValue>
+				<dev:type>
+					<maml:name>MailboxLocation</maml:name>
+					<maml:uri/>
+				</dev:type>
+				<dev:possibleValues>
+					<dev:possibleValue>
+						<dev:value>Local</dev:value>
+						<maml:description>
+							<maml:para>The mailbox should be created in the on-premise Exchange environment.</maml:para>
+						</maml:description>
+					</dev:possibleValue>
+					<dev:possibleValue>
+						<dev:value>Remote</dev:value>
+						<maml:description>
+							<maml:para>The mailbox should be created in the remote ("cloud"; Office365 or Live@edu) Exchange environment.</maml:para>
+						</maml:description>
+					</dev:possibleValue>
+				</dev:possibleValues>
+			</command:parameter>
+
+			<command:parameter required="true">
+				<maml:name>SendEmailNotification</maml:name>
+				<maml:description>
+					<maml:para>
+						The SendEmailNotification parameter specifies whether or not email notifications will be sent about the new mailbox.
+					</maml:para>
+				</maml:description>
+				<dev:type>
+					<maml:name>SwitchParameter</maml:name>
+					<maml:uri/>
+				</dev:type>
+				<dev:defaultValue>false</dev:defaultValue>
+			</command:parameter>
+
+			<command:parameter required="true">
+				<maml:name>EmailFrom</maml:name>
+				<maml:description>
+					<maml:para>
+						The email address that should be used as the From: address when sending emails.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">SmtpAddress</command:parameterValue>
+			</command:parameter>
+
+			<command:parameter required="false" pipelineInput="true (ByPropertyName)">
+				<maml:name>ExternalEmailAddress</maml:name>
+				<maml:description>
+					<maml:para>
+						The ExternalEmailAddress parameter specifies the email address that should be used as the From: address when sending emails.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">SmtpAddress</command:parameterValue>
+			</command:parameter>
+
+			<command:parameter required="false">
+				<maml:name>SmtpServer</maml:name>
+				<maml:description>
+					<maml:para>
+						Specifies the name of the SMTP server that sends the e-mail message.&#10;&#10;The default value is the value of the $PSEmailServer preference variable. If the preference variable is not set and this parameter is omitted, the command fails.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">Fqdn</command:parameterValue>
+			</command:parameter>
+
+			<command:parameter required="true">
+				<maml:name>LocalWelcomeEmailTemplate</maml:name>
+				<maml:description>
+					<maml:para>
+						The path to a file containing the template used to send the "welcome" email to a user who receives a local mailbox.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">FileInfo</command:parameterValue>
+			</command:parameter>
+
+			<command:parameter required="true">
+				<maml:name>RemoteWelcomeEmailTemplate</maml:name>
+				<maml:description>
+					<maml:para>
+						The path to a file containing the template used to send the "notification" email to a user who receives a remote mailbox.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">FileInfo</command:parameterValue>
+			</command:parameter>
+
+			<command:parameter required="true">
+				<maml:name>LocalNotificationEmailTemplate</maml:name>
+				<maml:description>
+					<maml:para>
+						The path to a file containing the template used to send the "welcome" email to a user who receives a local mailbox.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">FileInfo</command:parameterValue>
+			</command:parameter>
+
+			<command:parameter required="true">
+				<maml:name>RemoteNotificationEmailTemplate</maml:name>
+				<maml:description>
+					<maml:para>
+						The path to a file containing the template used to send the "notification" email to a user who receives a remote mailbox.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">FileInfo</command:parameterValue>
+			</command:parameter>
+
+			<command:parameter required="false">
+				<maml:name>DomainController</maml:name>
+				<maml:description>
+					<maml:para>
+						The DomainController parameter specifies the fully qualified domain name (FQDN) of the domain controller that retrieves data from Active Directory.
+					</maml:para>
+				</maml:description>
+				<command:parameterValue required="true">String</command:parameterValue>
+			</command:parameter>
+		</command:parameters>
+	</command:command>
+</helpItems>
