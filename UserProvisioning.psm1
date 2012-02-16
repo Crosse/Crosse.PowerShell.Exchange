@@ -260,6 +260,7 @@ function Add-ProvisionedMailbox {
         $savedAttributes = New-Object System.Collections.Hashtable
         $savedAttributes["DisplayName"] = $User.DisplayName
         $savedAttributes["SimpleDisplayName"] = $User.SimpleDisplayName
+        $savedAttributes["FirstName"] = $User.FirstName
 
         # It's not a "saved attribute", per se, but it'll be handled in
         # the same way as a MailUser's ExternalEmailAddress attribute.
@@ -379,13 +380,19 @@ function Add-ProvisionedMailbox {
                 try {
                     # TODO:  Remove the JMU-specific "(Dukes)" bit in the DisplayName.
                     # I don't know what to replace it with, though.  "(External)"?
-                    # Also, -FirstName and -LastName don't exist for Set-MailContact.  WTF?
+                    # Also, -FirstName and -LastName don't exist for Set-MailContact,
+                    # so use Set-Contact to update those.
                     Write-Verbose "Updating MailContact attributes"
                     Set-MailContact -Identity "$($username)-mc" `
                         -Name "$($username)-mc" `
                         -Alias "$($username)-mc" `
                         -DisplayName "$($User.DisplayName) (Dukes)" `
                         -ExternalEmailAddress $savedAttributes["ExternalEmailAddress"] `
+                        -DomainController $dc `
+                        -ErrorAction Stop
+                    Set-Contact -Identity "$($username)-mc" `
+                        -FirstName "$($User.FirstName)" `
+                        -LastName "$($User.LastName)" `
                         -DomainController $dc `
                         -ErrorAction Stop
                 } catch {
@@ -495,6 +502,7 @@ function Add-ProvisionedMailbox {
         foreach ($key in $savedAttributes.Keys) {
             if ($key -eq 'LegacyExchangeDN' -or
                 $key -eq 'ExternalEmailAddress' -or
+                $key -eq 'FirstName' -or
                 [String]::IsNullOrEmpty($savedAttributes[$key])) {
                 continue
             }
@@ -520,7 +528,7 @@ function Add-ProvisionedMailbox {
             $firstNameTemplateText = "[[FirstName]]"
 
             $subst = @{}
-            $subst[$firstNameTemplateText] = $User.FirstName
+            $subst[$firstNameTemplateText] = $savedAttributes["FirstName"]
 
             $welcomeEmailAddress = $null
             $notifyEmailAddress = $null
@@ -587,6 +595,9 @@ function Add-ProvisionedMailbox {
                     $notifyEmailAddress = $User.PrimarySmtpAddress.ToString()
                     $notifyEmailTemplate = $RemoteNotificationEmailTemplate
                 }
+
+                Write-Verbose "Stalling for 60 seconds to ensure mailbox is available"
+                Start-Sleep 60
             }
 
             if ($welcomeEmailAddress -ne $null) {
@@ -596,6 +607,7 @@ function Add-ProvisionedMailbox {
 
                 $Body = [String]::Join("`n", (Get-Content $welcomeEmailTemplate))
                 foreach ($key in $subst.Keys) {
+                    Write-Verbose "Replacing $key with $($subst[$key]) in welcome email"
                     $Body = $Body.Replace($key, $subst[$key])
                 }
 
@@ -612,11 +624,12 @@ function Add-ProvisionedMailbox {
 
             if ($notifyEmailAddress -ne $null) {
                 $notifyEmailAddress = $notifyEmailAddress.ToString()
-                $subst[$emailTemplateText] = $notifyEmailAddress
+                $subst[$emailTemplateText] = $welcomeEmailAddress
                 Write-Verbose "Sending Notify email to $notifyEmailAddress"
 
                 $Body = [String]::Join("`n", (Get-Content $notifyEmailTemplate))
                 foreach ($key in $subst.Keys) {
+                    Write-Verbose "Replacing $key with $($subst[$key]) in notify email"
                     $Body = $Body.Replace($key, $subst[$key])
                 }
 
