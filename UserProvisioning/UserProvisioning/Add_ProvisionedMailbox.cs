@@ -1,4 +1,20 @@
-﻿using System;
+﻿/*
+ * Copyright (c) 2011 Seth Wright <wrightst@jmu.edu>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,6 +22,7 @@ using System.DirectoryServices.ActiveDirectory;
 using Microsoft.Exchange.Data.Directory;
 using Microsoft.Exchange.Data;
 using Microsoft.Exchange.Data.Common;
+using Microsoft.Exchange.Data.Directory.Management;
 using System.Management.Automation;
 using System.IO;
 
@@ -16,142 +33,117 @@ namespace Jmu.Exchange.Provisioning
     /// </summary>
     [Cmdlet(VerbsCommon.Add, "ProvisionedMailbox")]
     [CmdletBinding(ConfirmImpact = ConfirmImpact.High,
-        SupportsShouldProcess = true,
-        DefaultParameterSetName = "DefaultParameterSet")]
+        SupportsShouldProcess = true)]
     public class Add_ProvisionedMailbox : PSCmdlet
     {
-        /// <summary>
-        /// The Identity parameter specifies the user to be provisioned.  The user must already exist in Active Directory.
-        /// </summary>
+        #region Parameters
         [Parameter(Mandatory = true,
             Position = 0,
             ValueFromPipeline = true)]
-        //[Parameter(Mandatory = true,
-        //    Position = 0,
-        //    ValueFromPipeline = true,
-        //    ParameterSetName = "SendEmails")]
         [ValidateNotNullOrEmpty()]
         [Alias("Name")]
+        [Alias("id")]
         public string Identity;
 
-        ///// <summary>
-        ///// The MailboxLocation parameter specifies the location where the mailbox should be provisioned.
-        ///// </summary>
-        //[Parameter(Mandatory = true,
-        //    ValueFromPipelineByPropertyName = true,
-        //    ParameterSetName = "DefaultParameterSet")]
-        //[Parameter(Mandatory = true,
-        //    ValueFromPipelineByPropertyName = true,
-        //    ParameterSetName = "SendEmails")]
-        //public MailboxLocation MailboxLocation;
-
         [Parameter(Mandatory = true,
-            ParameterSetName = "LocalNoEmail")]
-        [Parameter(Mandatory = true,
-            ParameterSetName = "LocalEmail")]
+            ParameterSetName = "Local")]
         public SwitchParameter Local;
 
-        [Parameter(Mandatory = true,
-            ParameterSetName = "RemoteNoEmail")]
-        [Parameter(Mandatory = true,
-            ParameterSetName = "RemoteEmail")]
-        public SwitchParameter Remote;
+        //[Parameter(Mandatory = true,
+        //    ParameterSetName = "Remote")]
+        //public SwitchParameter Remote;
 
-        /// <summary>
-        /// When <see cref="MailboxLocation"/> is "Remote", the email address of the user's mailbox.
-        /// </summary>
-        [Parameter(Mandatory = true,
-            ParameterSetName = "RemoteNoEmail",
-            ValueFromPipelineByPropertyName = true)]
-        [Parameter(Mandatory = true,
-            ParameterSetName = "RemoteEmail",
-            ValueFromPipelineByPropertyName = true)]
-        public SmtpAddress ExternalEmailAddress;
+        //[Parameter(Mandatory = true,
+        //    ParameterSetName = "Remote",
+        //    ValueFromPipelineByPropertyName = true)]
+        //public SmtpAddress ExternalEmailAddress;
 
-        /// <summary>
-        /// Specifies whether or not email notifications will be sent about the new mailbox.
-        /// </summary>
-        [Parameter(Mandatory = true,
-            ParameterSetName = "LocalEmail")]
-        [Parameter(Mandatory = true,
-            ParameterSetName = "RemoteEmail")]
-        public SwitchParameter SendEmailNotification = false;
+        [Parameter(Mandatory = false)]
+        public SwitchParameter UseDefaultCredential;
 
-        /// <summary>
-        /// The email address that should be used as the From: address when sending emails.
-        /// </summary>
-        [Parameter(Mandatory = true,
-            ParameterSetName = "LocalEmail")]
-        [Parameter(Mandatory = true,
-            ParameterSetName = "RemoteEmail")]
-        [ValidateNotNullOrEmpty()]
-        public SmtpAddress EmailFrom;
+        [Parameter(Mandatory = false)]
+        [Credential()]
+        public PSCredential Credential;
 
-        /// <summary>
-        /// The SMTP server used to send the emails.
-        /// </summary>
-        [Parameter(Mandatory = false,
-            ParameterSetName = "LocalEmail")]
-        [Parameter(Mandatory = false,
-            ParameterSetName = "RemoteEmail")]
-        [ValidateNotNullOrEmpty()]
-        public string SmtpServer;
+        #region EmailParameters
+        ///// <summary>
+        ///// Specifies whether or not email notifications will be sent about the new mailbox.
+        ///// </summary>
+        //[Parameter(Mandatory = true,
+        //    ParameterSetName = "LocalEmail")]
+        //[Parameter(Mandatory = true,
+        //    ParameterSetName = "RemoteEmail")]
+        //public SwitchParameter SendEmailNotification = false;
 
-        /// <summary>
-        /// The path to a file containing the template used to send the "welcome" email to a user who receives a local mailbox.
-        /// </summary>
-        [Parameter(Mandatory = false,
-            ParameterSetName = "LocalEmail")]
-        [Parameter(Mandatory = false,
-            ParameterSetName = "RemoteEmail")]
-        [ValidateNotNullOrEmpty()]
-        public FileInfo LocalWelcomeEmailTemplate;
+        ///// <summary>
+        ///// The email address that should be used as the From: address when sending emails.
+        ///// </summary>
+        //[Parameter(Mandatory = true,
+        //    ParameterSetName = "LocalEmail")]
+        //[Parameter(Mandatory = true,
+        //    ParameterSetName = "RemoteEmail")]
+        //[ValidateNotNullOrEmpty()]
+        //public SmtpAddress EmailFrom;
 
-        /// <summary>
-        /// The path to a file containing the template used to send the "welcome" email to a user who receives a remote mailbox.
-        /// </summary>
-        [Parameter(Mandatory = false,
-            ParameterSetName = "LocalEmail")]
-        [Parameter(Mandatory = false,
-            ParameterSetName = "RemoteEmail")]
-        [ValidateNotNullOrEmpty()]
-        public FileInfo RemoteWelcomeEmailTemplate;
+        ///// <summary>
+        ///// The SMTP server used to send the emails.
+        ///// </summary>
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "LocalEmail")]
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "RemoteEmail")]
+        //[ValidateNotNullOrEmpty()]
+        //public string SmtpServer;
 
-        /// <summary>
-        /// The path to a file containing the template used to send the "notification" email to a user who receives a local mailbox.
-        /// </summary>
-        [Parameter(Mandatory = false,
-            ParameterSetName = "LocalEmail")]
-        [Parameter(Mandatory = false,
-            ParameterSetName = "RemoteEmail")]
-        [ValidateNotNullOrEmpty()]
-        public FileInfo LocalNotificationEmailTemplate;
+        ///// <summary>
+        ///// The path to a file containing the template used to send the "welcome" email to a user who receives a local mailbox.
+        ///// </summary>
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "LocalEmail")]
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "RemoteEmail")]
+        //[ValidateNotNullOrEmpty()]
+        //public FileInfo LocalWelcomeEmailTemplate;
 
-        /// <summary>
-        /// The path to a file containing the template used to send the "notification" email to a user who receives a remote mailbox.
-        /// </summary>
-        [Parameter(Mandatory = false,
-            ParameterSetName = "LocalEmail")]
-        [Parameter(Mandatory = false,
-            ParameterSetName = "RemoteEmail")]
-        [ValidateNotNullOrEmpty()]
-        public FileInfo RemoteNotificationEmailTemplate;
+        ///// <summary>
+        ///// The path to a file containing the template used to send the "welcome" email to a user who receives a remote mailbox.
+        ///// </summary>
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "LocalEmail")]
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "RemoteEmail")]
+        //[ValidateNotNullOrEmpty()]
+        //public FileInfo RemoteWelcomeEmailTemplate;
 
-        /// <summary>
-        /// The DomainController parameter specifies the fully qualified domain name (FQDN) of the domain controller that retrieves data from Active Directory.
-        /// </summary>
+        ///// <summary>
+        ///// The path to a file containing the template used to send the "notification" email to a user who receives a local mailbox.
+        ///// </summary>
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "LocalEmail")]
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "RemoteEmail")]
+        //[ValidateNotNullOrEmpty()]
+        //public FileInfo LocalNotificationEmailTemplate;
+
+        ///// <summary>
+        ///// The path to a file containing the template used to send the "notification" email to a user who receives a remote mailbox.
+        ///// </summary>
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "LocalEmail")]
+        //[Parameter(Mandatory = false,
+        //    ParameterSetName = "RemoteEmail")]
+        //[ValidateNotNullOrEmpty()]
+        //public FileInfo RemoteNotificationEmailTemplate;
+        #endregion
+
         [Parameter(Mandatory = false)]
         [ValidateNotNullOrEmpty()]
         public string DomainController;
-
-        private static string modulePath;
+        #endregion
 
         protected override void BeginProcessing()
         {
             base.BeginProcessing();
-
-            if (String.IsNullOrEmpty(modulePath))
-                modulePath = SessionState.Module.Path;
 
             WriteVerbose("Performing initialization actions");
             if (DomainController == null)
@@ -160,40 +152,26 @@ namespace Jmu.Exchange.Provisioning
             }
             WriteVerbose(String.Format("Using domain controller {0}", DomainController));
 
-                        if (SendEmailNotification && LocalWelcomeEmailTemplate == null)
+            if (UseDefaultCredential && Credential != null)
             {
-                LocalWelcomeEmailTemplate = new FileInfo(Path.Combine(modulePath, "LocalWelcomeEmailTemplate.html"));
-                if (!LocalWelcomeEmailTemplate.Exists)
-                    throw new ParameterBindingException("LocalWelcomeEmailTemplate");
+                ThrowTerminatingError(new ErrorRecord(
+                    new PSArgumentException("Specify either LocalUseDefaultCredential or LocalCredential, but not both."),
+                    "ArgumentNullException", ErrorCategory.InvalidArgument, null));
+            }
+            if (Credential != null)
+            {
+                WriteVerbose(String.Format("Using explicit credential with username of {0}", Credential.UserName));
             }
 
-            if (SendEmailNotification && RemoteWelcomeEmailTemplate == null)
-            {
-                RemoteWelcomeEmailTemplate = new FileInfo(Path.Combine(modulePath, "RemoteWelcomeEmailTemplate.html"));
-                if (!RemoteNotificationEmailTemplate.Exists)
-                    throw new ParameterBindingException("RemoteWelcomeEmailTemplate");
-            }
-
-            if (SendEmailNotification && LocalNotificationEmailTemplate == null)
-            {
-                LocalNotificationEmailTemplate = new FileInfo(Path.Combine(modulePath, "LocalNotificationEmailTemplate.html"));
-                if (!LocalNotificationEmailTemplate.Exists)
-                    throw new ParameterBindingException("LocalNotificationEmailTemplate");
-            }
-
-            if (SendEmailNotification && RemoteNotificationEmailTemplate == null)
-            {
-                RemoteNotificationEmailTemplate = new FileInfo(Path.Combine(modulePath, "RemoteNotificationEmailTemplate.html"));
-                if (!RemoteNotificationEmailTemplate.Exists)
-                    throw new ParameterBindingException("RemoteNotificationEmailTemplate");
-            }
-
+            WriteVerbose("Initialization complete.");
         }
 
         protected override void ProcessRecord()
         {
             base.ProcessRecord();
             WriteVerbose("In ProcessRecord()");
+
+            ProvisioningResult result = new ProvisioningResult();
         }
 
         protected override void EndProcessing()

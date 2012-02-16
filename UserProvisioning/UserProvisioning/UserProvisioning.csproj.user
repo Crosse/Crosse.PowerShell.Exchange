@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <StartArguments>-NoProfile -NoExit -Command "&amp; { Import-Module -Name '.\UserProvisioning.dll' ; cd \ }"</StartArguments>
+    <StartAction>Program</StartAction>
+    <StartProgram>C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe</StartProgram>
+    <StartWorkingDirectory>C:\Users\wrightst\code\public\scripts\powershell\modules\Crosse.PowerShell.Exchange\UserProvisioning\bin\Debug</StartWorkingDirectory>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+</Project>
