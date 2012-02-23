@@ -113,6 +113,13 @@ function Add-ProvisionedMailbox {
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
+            [ValidateScript({ (Test-Path $_) })]
+            [string]
+            # The directory in which to place a CSV file containing email welcome/notification recipients.
+            $EmailNotificationPath = (Join-Path $PWD "EmailNotifications"),
+
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
             [string]
             # The domain controller to use for all operations.
             $DomainController,
@@ -152,19 +159,11 @@ function Add-ProvisionedMailbox {
             }
         }
 
-        $eapref = $ErrorActionPreference
-        $ErrorActionPreference = "SilentlyContinue"
-        $type = Add-Type -PassThru `
-                         -Path "C:\Program Files\Microsoft\Exchange\Web Services\1.1\Microsoft.Exchange.WebServices.dll" `
-        $ErrorActionPreference = $eapref
-        if ($type -eq $null) {
-            $type = Add-Type -PassThru -Path (Join-Path $PSScriptRoot "Microsoft.Exchange.WebServices.dll")
-            if ($type -eq $null) {
-                Write-Error "Cannot find the EWS Managed API assembly!"
-                continue
-            }
+        if ([String]::IsNullOrEmpty($EmailNotificationPath) -eq $false) {
+            $emailNotificationFile = Join-Path $EmailNotificationPath (Get-Date -Format yyyy-MM-dd_HH-mm-ss)
+            $emailNotifications = New-Object System.Collections.ArrayList
+            Write-Verbose "Will record email notifies in file $emailNotificationFile"
         }
-        $service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService "Exchange2010"
 
         Write-Verbose "Using Domain Controller $dc"
         Write-Verbose "Initialization complete."
@@ -523,126 +522,39 @@ function Add-ProvisionedMailbox {
         }
 
         # Send emails where appropriate.
-        if ($SendEmailNotification -eq $true) {
-            $emailTemplateText = "[[EmailAddress]]"
-            $firstNameTemplateText = "[[FirstName]]"
-
-            $subst = @{}
-            $subst[$firstNameTemplateText] = $savedAttributes["FirstName"]
-
-            $welcomeEmailAddress = $null
-            $notifyEmailAddress = $null
+        if ($SendEmailNotification -eq $true -and $EmailNotificationPath -ne $null) {
+            $emailDetails = New-Object PSObject -Property @{
+                Name            = $User.Name
+                WelcomeAddress  = $null
+                WelcomeTemplate = $null
+                WelcomeSubject  = $null
+                NotifyAddress   = $null
+                NotifyTemplate  = $null
+                NotifySubject   = $null
+            }
 
             if ($MailboxLocation -eq "Local") {
-                $welcomeEmailAddress = $User.PrimarySmtpAddress.ToString()
-                $welcomeEmailTemplate = $LocalWelcomeEmailTemplate
-                $subject = "You now have a JMU Exchange E-mail Account"
+                $emailDetails.WelcomeAddress = $User.PrimarySmtpAddress.ToString()
+                $emailDetails.WelcomeTemplate = $LocalWelcomeEmailTemplate
+                $emailDetails.WelcomeSubject = "You now have a JMU Exchange E-mail Account"
 
                 if ($contact -ne $null) {
-                    $notifyEmailAddress = $contact.ExternalEmailAddress.SmtpAddress
-                    $notifyEmailTemplate = $LocalNotificationEmailTemplate
+                    $emailDetails.NotifyAddress = $contact.ExternalEmailAddress.SmtpAddress
+                    $emailDetails.NotifyTemplate = $LocalNotificationEmailTemplate
                 }
-
-
-                Write-Verbose "Waiting for user's mailbox to become available"
-                $start = Get-Date
-                do {
-                    Start-Sleep 1
-
-                    if ($service.Url -eq $null) {
-                        $ErrorActionPreference = "SilentlyContinue"
-                        $null = $service.AutodiscoverUrl($welcomeEmailAddress.ToString())
-                        $ErrorActionPreference = $eapref
-                        if ($service.Url -ne $null) {
-                            Write-Verbose "Found Autodiscover for $User: $($service.Url)"
-                        }
-                    } else {
-                        if ($names -eq $null -or $names.Count -eq 0) {
-                            $names = $service.ResolveName($welcomeEmailAddress.ToString())
-                            Write-Verbose "Found $user in GAL via EWS"
-                        }
-                        if ($names.Count -gt 0) {
-                            $permissions = Get-MailboxPermission -Identity $User `
-                                                -User "NT AUTHORITY\SELF" `
-                                                -DomainController $dc
-                            if ($permissions -ne $null) {
-                                Write-Verbose "Mailbox for $user has been created."
-                                break
-                            }
-                        }
-                    }
-
-                    $elapsed = ((Get-Date) - $start).TotalSeconds
-                } while ($elapsed -le 60)
-
-                Write-Verbose "Stalling for 15 seconds to ensure mailbox is available"
-                Start-Sleep 15
-
-                if ($elapsed -gt 60) {
-                    Write-Host ""
-                    Write-Verbose "Timeout waiting for recipient address to become available; email notification may fail."
-                }
-
             } elseif ($MailboxLocation -eq "Remote") {
-                $welcomeEmailTemplate = $RemoteWelcomeEmailTemplate
-                $subject = "You now have a JMU Live@edu Dukes E-mail Account"
+                $emailDetails.WelcomeTemplate = $RemoteWelcomeEmailTemplate
+                $emailDetails.WelcomeSubject = "You now have a JMU Live@edu Dukes E-mail Account"
 
                 if ($contact -eq $null) {
-                    $welcomeEmailAddress = $User.ExternalEmailAddress.SmtpAddress
+                    $emailDetails.WelcomeAddress = $User.ExternalEmailAddress.SmtpAddress
                 } else {
-                    $welcomeEmailAddress = $contact.ExternalEmailAddress.SmtpAddress
-
-                    $notifyEmailAddress = $User.PrimarySmtpAddress.ToString()
-                    $notifyEmailTemplate = $RemoteNotificationEmailTemplate
+                    $emailDetails.WelcomeAddress = $contact.ExternalEmailAddress.SmtpAddress
+                    $emailDetails.NotifyAddress = $User.PrimarySmtpAddress.ToString()
+                    $emailDetails.NotifyTemplate = $RemoteNotificationEmailTemplate
                 }
-
-                Write-Verbose "Stalling for 60 seconds to ensure mailbox is available"
-                Start-Sleep 60
             }
-
-            if ($welcomeEmailAddress -ne $null) {
-                $welcomeEmailAddress = $welcomeEmailAddress.ToString()
-                $subst[$emailTemplateText] = $welcomeEmailAddress
-                Write-Verbose "Sending Welcome email to $welcomeEmailAddress"
-
-                $Body = [String]::Join("`n", (Get-Content $welcomeEmailTemplate))
-                foreach ($key in $subst.Keys) {
-                    Write-Verbose "Replacing $key with $($subst[$key]) in welcome email"
-                    $Body = $Body.Replace($key, $subst[$key])
-                }
-
-                Send-MailMessage -From $EmailFrom `
-                                -To $welcomeEmailAddress `
-                                -Subject $subject `
-                                -Body $Body `
-                                -BodyAsHtml:$BodyAsHtml `
-                                -SmtpServer $SmtpServer `
-                                -UseSsl:$UseSsl `
-                                -Verbose
-                $resultObj.EmailSent = "Welcome"
-            }
-
-            if ($notifyEmailAddress -ne $null) {
-                $notifyEmailAddress = $notifyEmailAddress.ToString()
-                $subst[$emailTemplateText] = $welcomeEmailAddress
-                Write-Verbose "Sending Notify email to $notifyEmailAddress"
-
-                $Body = [String]::Join("`n", (Get-Content $notifyEmailTemplate))
-                foreach ($key in $subst.Keys) {
-                    Write-Verbose "Replacing $key with $($subst[$key]) in notify email"
-                    $Body = $Body.Replace($key, $subst[$key])
-                }
-
-                Send-MailMessage -From $EmailFrom `
-                                -To $notifyEmailAddress `
-                                -Subject $subject `
-                                -Body $Body `
-                                -BodyAsHtml:$BodyAsHtml `
-                                -SmtpServer $SmtpServer `
-                                -UseSsl:$UseSsl `
-                                -Verbose
-                $resultObj.EmailSent = [String]::Join("/", @($resultObj.EmailSent, "Notify"))
-            }
+            $EmailNotifications.Add($emailDetails)
         } else {
             Write-Verbose "Not sending emails"
         }
@@ -654,6 +566,11 @@ function Add-ProvisionedMailbox {
 
     # This section executes only once, after the pipeline.
     END {
+        if ($emailNotifications -ne $null -and $emailNotifications.Count -gt 0 -and
+                [String]::IsNullOrEmpty($emailNotificationFile) -eq $false) {
+            Write-Verbose "Writing out $emailNotificationFile"
+            $emailNotifications | Export-Csv -NoTypeInformation -Encoding ASCII -Path $emailNotificationFile
+        }
         Write-Verbose "Cleaning up"
     } # end 'END{}'
 }
