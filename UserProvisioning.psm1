@@ -693,7 +693,7 @@ function Send-ProvisioningNotification {
 
                 Write-Verbose "Sending email to $toaddr"
                 Send-MailMessage -To $toaddr -From $From -Body $body -BodyAsHtml `
-                                 -SmtpServer $SmtpServer -UseSsl:$UseSsl
+                                 -Subject $subject -SmtpServer $SmtpServer -UseSsl:$UseSsl
             }
         }
     }
