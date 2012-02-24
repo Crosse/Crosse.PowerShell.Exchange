@@ -688,7 +688,8 @@ function Send-ProvisioningNotification {
             if ([String]::IsNullOrEmpty($notify.MessageBody) -eq $false) {
                 $subject = $notify.Subject
                 $toaddr = $notify.Address
-                $body = [Convert]::FromBase64String($notify.MessageBody)
+                $encoder = New-Object System.Text.ASCIIEncoding
+                $body = $encoder.GetString([Convert]::FromBase64String($notify.MessageBody))
 
                 Write-Verbose "Sending email to $toaddr"
                 Send-MailMessage -To $toaddr -From $From -Body $body -BodyAsHtml `
