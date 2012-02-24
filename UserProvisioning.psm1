@@ -145,7 +145,7 @@ function Add-ProvisionedMailbox {
         }
 
         if ([String]::IsNullOrEmpty($EmailNotificationPath) -eq $false) {
-            $emailNotificationFile = Join-Path $EmailNotificationPath (Get-Date -Format yyyy-MM-dd_HH-mm-ss)
+            $emailNotificationFile = Join-Path $EmailNotificationPath "emailnotifications_$(Get-Date -Format yyyy-MM-dd_HH-mm-ss).csv"
             $emailNotifications = New-Object System.Collections.ArrayList
             Write-Verbose "Will record email notifies in file $emailNotificationFile"
         }
