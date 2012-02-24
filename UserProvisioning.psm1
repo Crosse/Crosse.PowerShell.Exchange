@@ -583,7 +583,6 @@ function Add-ProvisionedMailbox {
                     $EmailNotifications.Add($emailDetails)
                 }
             }
-            $EmailNotifications.Add($emailDetails)
         } else {
             Write-Verbose "Not sending emails"
         }
