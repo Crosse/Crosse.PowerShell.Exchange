@@ -508,38 +508,79 @@ function Add-ProvisionedMailbox {
 
         # Send emails where appropriate.
         if ($SendEmailNotification -eq $true -and $EmailNotificationPath -ne $null) {
-            $emailDetails = New-Object PSObject -Property @{
-                Name            = $User.Name
-                WelcomeAddress  = $null
-                WelcomeTemplate = $null
-                WelcomeSubject  = $null
-                NotifyAddress   = $null
-                NotifyTemplate  = $null
-                NotifySubject   = $null
-            }
-
             if ($MailboxLocation -eq "Local") {
-                $emailDetails.WelcomeAddress = $User.PrimarySmtpAddress.ToString()
-                $emailDetails.WelcomeTemplate = $LocalWelcomeEmailTemplate
-                $emailDetails.WelcomeSubject = "You now have a JMU Exchange E-mail Account"
+                # Queue up a welcome email to the local mailbox.
+                $emailDetails = New-EmailDetailsObject `
+                                    -Identity $User.Name `
+                                    -Address $User.PrimarySmtpAddress.ToString() `
+                                    -Subject "You now have a JMU Exchange E-mail Account"
+                $emailDetails.MessageBody = Resolve-TemplatedEmail `
+                                    -FilePath $LocalWelcomeEmailTemplate `
+                                    -ToBase64String `
+                                    -TemplateSubstitutions @{
+                                        "[[FirstName]]" = $savedAttributes["FirstName"]
+                                        "[[EmailAddress]]" = $User.PrimarySmtpAddress.ToString()
+                                    }
+                $EmailNotifications.Add($emailDetails)
 
                 if ($contact -ne $null) {
-                    $emailDetails.NotifyAddress = $contact.ExternalEmailAddress.SmtpAddress
-                    $emailDetails.NotifyTemplate = $LocalNotificationEmailTemplate
-                    $emailDetails.NotifySubject = "You now have a JMU Exchange E-mail Account"
+                    # Queue up a notification email to the remote mailbox.
+                    $emailDetails = New-EmailDetailsObject `
+                                        -Identity $User.Name `
+                                        -Address $contact.ExternalEmailAddress.SmtpAddress `
+                                        -Subject "You now have a JMU Exchange E-mail Account"
+                    $emailDetails.MessageBody = Resolve-TemplatedEmail `
+                                        -FilePath $LocalNotificationEmailTemplate `
+                                        -ToBase64String `
+                                        -TemplateSubstitutions @{
+                                            "[[FirstName]]" = $savedAttributes["FirstName"]
+                                            "[[EmailAddress]]" = $User.PrimarySmtpAddress.ToString()
+                                        }
+                    $EmailNotifications.Add($emailDetails)
                 }
             } elseif ($MailboxLocation -eq "Remote") {
-                $emailDetails.WelcomeTemplate = $RemoteWelcomeEmailTemplate
-                $emailDetails.WelcomeSubject = "You now have a JMU Live@edu Dukes E-mail Account"
-
                 if ($contact -eq $null) {
-                    $emailDetails.WelcomeAddress = $User.ExternalEmailAddress.SmtpAddress
+                    # Queue up a welcome email to the remote mailbox.
+                    $emailDetails = New-EmailDetailsObject `
+                                        -Identity $User.Name `
+                                        -Address $User.ExternalEmailAddress.SmtpAddress `
+                                        -Subject "You now have a JMU Live@edu Dukes E-mail Account"
+                    $emailDetails.MessageBody = Resolve-TemplatedEmail `
+                                        -FilePath $RemoteWelcomeEmailTemplate `
+                                        -ToBase64String `
+                                        -TemplateSubstitutions @{
+                                            "[[FirstName]]" = $savedAttributes["FirstName"]
+                                            "[[EmailAddress]]" = $User.ExternalEmailAddress.SmtpAddress
+                                        }
+                    $EmailNotifications.Add($emailDetails)
                 } else {
-                    $emailDetails.WelcomeAddress = $contact.ExternalEmailAddress.SmtpAddress
+                    # Queue up a welcome email to the remote mailbox
+                    $emailDetails = New-EmailDetailsObject `
+                                        -Identity $User.Name `
+                                        -Address $contact.ExternalEmailAddress.SmtpAddress `
+                                        -Subject "You now have a JMU Live@edu Dukes E-mail Account"
+                    $emailDetails.MessageBody = Resolve-TemplatedEmail `
+                                        -FilePath $RemoteWelcomeEmailTemplate `
+                                        -ToBase64String `
+                                        -TemplateSubstitutions @{
+                                            "[[FirstName]]" = $savedAttributes["FirstName"]
+                                            "[[EmailAddress]]" = $contact.ExternalEmailAddress.SmtpAddress
+                                        }
+                    $EmailNotifications.Add($emailDetails)
 
-                    $emailDetails.NotifyAddress = $User.PrimarySmtpAddress.ToString()
-                    $emailDetails.NotifyTemplate = $RemoteNotificationEmailTemplate
-                    $emailDetails.NotifySubject = "You now have a JMU Live@edu Dukes E-mail Account"
+                    # Queue up a notification email to the local mailbox.
+                    $emailDetails = New-EmailDetailsObject `
+                                        -Identity $User.Name `
+                                        -Address $User.PrimarySmtpAddress.ToString() `
+                                        -Subject "You now have a JMU Live@edu Dukes E-mail Account"
+                    $emailDetails.MessageBody = Resolve-TemplatedEmail `
+                                        -FilePath $RemoteNotificationEmailTemplate `
+                                        -ToBase64String `
+                                        -TemplateSubstitutions @{
+                                            "[[FirstName]]" = $savedAttributes["FirstName"]
+                                            "[[EmailAddress]]" = $contact.ExternalEmailAddress.SmtpAddress
+                                        }
+                    $EmailNotifications.Add($emailDetails)
                 }
             }
             $EmailNotifications.Add($emailDetails)
@@ -561,4 +602,99 @@ function Add-ProvisionedMailbox {
         }
         Write-Verbose "Cleaning up"
     } # end 'END{}'
+}
+
+function New-EmailDetailsObject {
+    param (
+            $Identity,
+            $Address,
+            $MessageBody,
+            $Subject
+          )
+
+    return New-Object PSObject -Property @{
+        Identity    = $Identity
+        Address     = $Address
+        MessageBody = $MessageBody
+        Subject     = $Subject
+    }
+}
+
+function Resolve-TemplatedEmail {
+    param (
+            [Parameter(Mandatory=$true)]
+            [ValidateNotNullOrEmpty()]
+            [ValidateScript({ (Test-Path $_) })]
+            [IO.FileInfo]
+            $FilePath,
+
+            [Parameter(Mandatory=$true)]
+            [System.Collections.Hashtable]
+            $TemplateSubstitutions,
+
+            [switch]
+            $ToBase64String
+          )
+
+    PROCESS {
+        $Body = Get-Content $FilePath
+        $Body = [String]::Join("`n", $Body)
+
+        if ([String]::IsNullOrEmpty($Body)) {
+            Write-Error "Template file $template either does not exist or is empty!"
+            return
+        }
+
+        foreach ($key in $TemplateSubstitutions.Keys) {
+            $Body = $Body.Replace($key, $TemplateSubstitutions[$key])
+        }
+
+        if ($ToBase64String) {
+            $encoder = New-Object System.Text.ASCIIEncoding
+            $Body = $encoder.GetBytes($Body)
+            $Body = [Convert]::ToBase64String($Body)
+        }
+        return $Body
+    }
+}
+
+function Send-ProvisioningNotification {
+    [CmdletBinding(SupportsShouldProcess=$true,
+            ConfirmImpact="High")]
+    param (
+            [Parameter(Mandatory=$true,
+                ValueFromPipeline=$true)]
+            [ValidateNotNullOrEmpty()]
+            [ValidateScript({ (Test-Path $_) })]
+            [IO.FileInfo]
+            $FilePath,
+
+            [Parameter(Mandatory=$true)]
+            [ValidateNotNullOrEmpty()]
+            [System.Net.Mail.MailAddress]
+            $From,
+
+            [Parameter(Mandatory=$true)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $SmtpServer = $PSEmailServer,
+
+            [switch]
+            $UseSsl
+          )
+    PROCESS {
+        $notifies = Import-Csv $FilePath
+
+        foreach ($notify in $notifies) {
+            if ([String]::IsNullOrEmpty($notify.Template) -eq $false) {
+                $subject = $notify.Subject
+                $template = $notify.Template
+                $toaddr = $notify.Address
+                $body = [Convert]::FromBase64String($notify.MessageBody)
+
+                Send-MailMessage -To $toaddr -From $From -Body $body -BodyAsHtml `
+                                 -SmtpServer $SmtpServer -UseSsl:$UseSsl
+            }
+        }
+    }
 }
