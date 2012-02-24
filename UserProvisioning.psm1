@@ -68,19 +68,6 @@ function Add-ProvisionedMailbox {
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
-            [ValidateScript({ $_.Contains("@") })]
-            [string]
-            # The email address that should be used as the From: address when sending emails.
-            $EmailFrom,
-
-            [Parameter(Mandatory=$false)]
-            [ValidateNotNullOrEmpty()]
-            [string]
-            # The SMTP server used to send the emails.
-            $SmtpServer,
-
-            [Parameter(Mandatory=$false)]
-            [ValidateNotNullOrEmpty()]
             [ValidateScript({ (Test-Path $_) })]
             [string]
             # The path to a file containing the template used to send the "welcome" email to
@@ -151,9 +138,7 @@ function Add-ProvisionedMailbox {
             if ([String]::IsNullOrEmpty($LocalWelcomeEmailTemplate) -or
                     [String]::IsNullOrEmpty($LocalNotificationEmailTemplate) -or
                     [String]::IsNullOrEmpty($RemoteWelcomeEmailTemplate) -or
-                    [String]::IsNullOrEmpty($RemoteNotificationEmailTemplate) -or
-                    [String]::IsNullOrEmpty($EmailFrom) -or
-                    [String]::IsNullOrEmpty($SmtpServer)) {
+                    [String]::IsNullOrEmpty($RemoteNotificationEmailTemplate)) {
                 Write-Error "Not all parameters found to support sending email."
                 continue
             }
