@@ -685,12 +685,12 @@ function Send-ProvisioningNotification {
         $notifies = Import-Csv $FilePath
 
         foreach ($notify in $notifies) {
-            if ([String]::IsNullOrEmpty($notify.Template) -eq $false) {
+            if ([String]::IsNullOrEmpty($notify.MessageBody) -eq $false) {
                 $subject = $notify.Subject
-                $template = $notify.Template
                 $toaddr = $notify.Address
                 $body = [Convert]::FromBase64String($notify.MessageBody)
 
+                Write-Verbose "Sending email to $toaddr"
                 Send-MailMessage -To $toaddr -From $From -Body $body -BodyAsHtml `
                                  -SmtpServer $SmtpServer -UseSsl:$UseSsl
             }
