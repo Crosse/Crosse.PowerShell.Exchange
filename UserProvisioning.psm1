@@ -526,6 +526,7 @@ function Add-ProvisionedMailbox {
                 if ($contact -ne $null) {
                     $emailDetails.NotifyAddress = $contact.ExternalEmailAddress.SmtpAddress
                     $emailDetails.NotifyTemplate = $LocalNotificationEmailTemplate
+                    $emailDetails.NotifySubject = "You now have a JMU Exchange E-mail Account"
                 }
             } elseif ($MailboxLocation -eq "Remote") {
                 $emailDetails.WelcomeTemplate = $RemoteWelcomeEmailTemplate
@@ -535,8 +536,10 @@ function Add-ProvisionedMailbox {
                     $emailDetails.WelcomeAddress = $User.ExternalEmailAddress.SmtpAddress
                 } else {
                     $emailDetails.WelcomeAddress = $contact.ExternalEmailAddress.SmtpAddress
+
                     $emailDetails.NotifyAddress = $User.PrimarySmtpAddress.ToString()
                     $emailDetails.NotifyTemplate = $RemoteNotificationEmailTemplate
+                    $emailDetails.NotifySubject = "You now have a JMU Live@edu Dukes E-mail Account"
                 }
             }
             $EmailNotifications.Add($emailDetails)
