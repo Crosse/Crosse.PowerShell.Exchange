@@ -259,7 +259,7 @@ function Add-ProvisionedMailbox {
             try {
                 $User = Get-Recipient $username -DomainController $dc -ErrorAction Stop
             } catch {
-                $err = "Could not perform Get-Recipient on $username:  $_"
+                $err = "Could not perform Get-Recipient on ${username}:  $_"
                 Write-Error $err
                 $resultObj.Error = $err
                 return $resultObj
