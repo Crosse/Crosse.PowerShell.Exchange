@@ -400,7 +400,7 @@ function Add-ProvisionedMailbox {
                 # Only add the X500 address if it doesn't already exist.
                 if ($contact.EmailAddresses.Contains($addr) -eq $false) {
                     Write-Verbose "Adding LegacyExchangeDN to new MailContact as an X500 address"
-                    $contact.EmailAddresses.Add($addr)
+                    $null = $contact.EmailAddresses.Add($addr)
 
                     try {
                         Write-Verbose "Attempting to set new EmailAddresses for user"
@@ -521,7 +521,7 @@ function Add-ProvisionedMailbox {
                                         "[[FirstName]]" = $savedAttributes["FirstName"]
                                         "[[EmailAddress]]" = $User.PrimarySmtpAddress.ToString()
                                     }
-                $EmailNotifications.Add($emailDetails)
+                $null = $EmailNotifications.Add($emailDetails)
 
                 if ($contact -ne $null) {
                     # Queue up a notification email to the remote mailbox.
@@ -536,7 +536,7 @@ function Add-ProvisionedMailbox {
                                             "[[FirstName]]" = $savedAttributes["FirstName"]
                                             "[[EmailAddress]]" = $User.PrimarySmtpAddress.ToString()
                                         }
-                    $EmailNotifications.Add($emailDetails)
+                    $null = $EmailNotifications.Add($emailDetails)
                 }
             } elseif ($MailboxLocation -eq "Remote") {
                 if ($contact -eq $null) {
@@ -552,7 +552,7 @@ function Add-ProvisionedMailbox {
                                             "[[FirstName]]" = $savedAttributes["FirstName"]
                                             "[[EmailAddress]]" = $User.ExternalEmailAddress.SmtpAddress
                                         }
-                    $EmailNotifications.Add($emailDetails)
+                    $null = $EmailNotifications.Add($emailDetails)
                 } else {
                     # Queue up a welcome email to the remote mailbox
                     $emailDetails = New-EmailDetailsObject `
@@ -566,7 +566,7 @@ function Add-ProvisionedMailbox {
                                             "[[FirstName]]" = $savedAttributes["FirstName"]
                                             "[[EmailAddress]]" = $contact.ExternalEmailAddress.SmtpAddress
                                         }
-                    $EmailNotifications.Add($emailDetails)
+                    $null = $EmailNotifications.Add($emailDetails)
 
                     # Queue up a notification email to the local mailbox.
                     $emailDetails = New-EmailDetailsObject `
@@ -580,7 +580,7 @@ function Add-ProvisionedMailbox {
                                             "[[FirstName]]" = $savedAttributes["FirstName"]
                                             "[[EmailAddress]]" = $contact.ExternalEmailAddress.SmtpAddress
                                         }
-                    $EmailNotifications.Add($emailDetails)
+                    $null = $EmailNotifications.Add($emailDetails)
                 }
             }
         } else {
