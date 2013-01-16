@@ -68,7 +68,8 @@ NestedModules = 'UserProvisioning.psm1',
                 'Get-RedirectRuleInformation.psm1',
                 'RemoteConections.psm1',
                 'Get-ExchangeReplicationInfo.psm1',
-                'Get-MailboxDatabaseStatistics.psm1'
+                'Get-MailboxDatabaseStatistics.psm1',
+                'EmailTemplateFunctions.psm1'
 
 # Functions to export from this module
 FunctionsToExport = '*'
@@ -88,7 +89,8 @@ ModuleList =    'UserProvisioning.psm1',
                 'Get-RedirectRuleInformation.psm1',
                 'RemoteConections.psm1',
                 'Get-ExchangeReplicationInfo.psm1',
-                'Get-MailboxDatabaseStatistics.psm1'
+                'Get-MailboxDatabaseStatistics.psm1',
+                'EmailTemplateFunctions.psm1'
 
 # List of all files packaged with this module
 FileList =      'UserProvisioning.psm1',
@@ -96,7 +98,8 @@ FileList =      'UserProvisioning.psm1',
                 'Get-RedirectRuleInformation.psm1',
                 'RemoteConections.psm1',
                 'Get-ExchangeReplicationInfo.psm1',
-                'Get-MailboxDatabaseStatistics.psm1'
+                'Get-MailboxDatabaseStatistics.psm1',
+                'EmailTemplateFunctions.psm1'
 
 # Private data to pass to the module specified in ModuleToProcess
 PrivateData = ''
