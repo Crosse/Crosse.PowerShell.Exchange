@@ -164,7 +164,7 @@ function Add-ResourceDelegate {
         foreach ($dn in $sobo) {
             if ( (Get-Mailbox -Identity $dn -ErrorAction SilentlyContinue) -eq $null) {
                 Write-Verbose "Removing $dn from GrantSendOnBehalfTo list because user no longer has a mailbox"
-                $sobo.Remove($dn)
+                $null = $sobo.Remove($dn)
                 $dirty = $true
             }
         }
@@ -173,7 +173,7 @@ function Add-ResourceDelegate {
             # Grant SendOnBehalfOf rights to the owner, if appropriate
             if ($objUser.RecipientType -match 'MailUser' -or $objUser.RecipientType -match 'UserMailbox') {
                 if ( !$sobo.Contains($objUser.DistinguishedName) ) {
-                    $sobo.Add( $objUser.DistinguishedName )
+                    $null = $sobo.Add( $objUser.DistinguishedName )
                     $dirty = $true
                 }
             } else {
@@ -197,7 +197,7 @@ function Add-ResourceDelegate {
             Write-Verbose "Adding $objUser as a resource delegate on $resource"
             $resourceDelegates = (Get-CalendarProcessing -Identity $resource).ResourceDelegates
             if ( ! $resourceDelegates.Contains($objUser.DistinguishedName) ) {
-                $resourceDelegates.Add($objUser.DistinguishedName)
+                $null = $resourceDelegates.Add($objUser.DistinguishedName)
             }
 
             try {
