@@ -204,7 +204,9 @@ $orderBy
         Write-Host $query
     } else {
         Write-Verbose "Running query..."
+        $begin = Get-Date
         $results = & $LogParserLocation -stats:OFF -o:CSV "$query"
+        Write-Verbose "Query took $(((Get-Date) - $begin).TotalSeconds) seconds."
         if ($results -eq $null) {
             Write-Warning "Query produced no results."
         } else {
