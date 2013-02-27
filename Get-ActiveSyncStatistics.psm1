@@ -94,6 +94,11 @@ function Get-ActiveSyncStatistics {
             $ResultSize,
 
             [Parameter(Mandatory=$false)]
+            # Specifies that the results should be sorted by hits, returning the devices with the highest number of hits.
+            [switch]
+            $Descending,
+
+            [Parameter(Mandatory=$false)]
             # Specifies the minumum number of "hits" a device must have generated in order for it to be included in the results.  A "hit" equates to any ActiveSync command.
             [Nullable[int]]
             $MinimumHits,
@@ -146,6 +151,10 @@ function Get-ActiveSyncStatistics {
         $havingHits = "HAVING TotalHits > $MinimumHits"
     }
 
+    if ($Descending) {
+        $orderBy = "ORDER BY TotalHits DESC"
+    }
+
     $formattedStartTime = $Start.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')
     $formattedEndTime = $End.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')
 
@@ -189,6 +198,7 @@ WHERE
         TO_TIMESTAMP('$formattedEndTime', 'yyyy-MM-dd HH:mm:ss')
 GROUP BY Username, DeviceId, DeviceType, DeviceUserAgent
 $havingHits
+$orderBy
 "@
 
     if ($WhatIf) {
