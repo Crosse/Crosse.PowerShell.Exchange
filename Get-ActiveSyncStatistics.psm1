@@ -26,7 +26,7 @@
     Access Server.
 
     .INPUTS
-    Stuff.
+    None.  Get-ActiveSyncStatistics does not take any input from the pipeline.
 
     .OUTPUTS
     Things.
@@ -60,14 +60,12 @@ function Get-ActiveSyncStatistics {
     [CmdletBinding()]
     param (
             [Parameter(Mandatory=$true,
-                ValueFromPipeline=$true,
                 ParameterSetName="User")]
             [string]
             # Specifies the username (without the domain) to search for.
             $User,
 
             [Parameter(Mandatory=$false,
-                ValueFromPipeline=$true,
                 ParameterSetName="Device")]
             # Specifies the device id to search for.
             [string]
