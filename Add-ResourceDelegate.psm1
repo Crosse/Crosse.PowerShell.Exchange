@@ -159,13 +159,19 @@ function Add-ResourceDelegate {
         # Loop through and remove any users who are no longer valid.
         # Do this always, instead of only when $GrantSendOnBehalfTo is specified.
         $sobo = (Get-Mailbox -DomainController $dc -Identity $resource).GrantSendOnBehalfTo
-        Write-Verbose "Identifying invalid users in the GrantSendOnBehalfTo list"
-        $dirty = $false
-        foreach ($dn in $sobo) {
-            if ( (Get-Mailbox -Identity $dn -ErrorAction SilentlyContinue) -eq $null) {
+        $dnsToRemove = @()
+        if ($sobo.Count -gt 0) {
+            Write-Verbose "Identifying invalid users in the GrantSendOnBehalfTo list"
+            $dirty = $false
+            foreach ($dn in $sobo) {
+                if ( (Get-Mailbox -Identity $dn -ErrorAction SilentlyContinue) -eq $null) {
+                    $dnsToRemove += $dn
+                    $dirty = $true
+                }
+            }
+            foreach ($dn in $dnsToRemove) {
                 Write-Verbose "Removing $dn from GrantSendOnBehalfTo list because user no longer has a mailbox"
                 $null = $sobo.Remove($dn)
-                $dirty = $true
             }
         }
 
