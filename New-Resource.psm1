@@ -39,7 +39,6 @@ $Bcc                = "wrightst@jmu.edu, millerca@jmu.edu, najdziav@jmu.edu, eck
 $Fqdn               = "exchange.jmu.edu"
 $BaseDN             = "ad.jmu.edu/ExchangeObjects"
 
-##################################
 $cwd                = [System.IO.Path]::GetDirectoryName(($MyInvocation.MyCommand).Definition)
 $DomainController   = (gc Env:\LOGONSERVER).Replace('\', '')
 if ($DomainController -eq $null) { 
