@@ -71,7 +71,8 @@ NestedModules = 'UserProvisioning.psm1',
                 'Get-MailboxDatabaseStatistics.psm1',
                 'Add-ResourceDelegate.psm1',
                 'EmailTemplateFunctions.psm1',
-                'Get-ActiveSyncStatistics.psm1'
+                'Get-ActiveSyncStatistics.psm1',
+                'Get-SmtpLogs.psm1'
 
 # Functions to export from this module
 FunctionsToExport = '*'
@@ -94,7 +95,8 @@ ModuleList =    'UserProvisioning.psm1',
                 'Get-MailboxDatabaseStatistics.psm1',
                 'Add-ResourceDelegate.psm1',
                 'EmailTemplateFunctions.psm1',
-                'Get-ActiveSyncStatistics.psm1'
+                'Get-ActiveSyncStatistics.psm1',
+                'Get-SmtpLogs.psm1'
 
 # List of all files packaged with this module
 FileList =      'UserProvisioning.psm1',
@@ -105,7 +107,8 @@ FileList =      'UserProvisioning.psm1',
                 'Get-MailboxDatabaseStatistics.psm1',
                 'Add-ResourceDelegate.psm1',
                 'EmailTemplateFunctions.psm1',
-                'Get-ActiveSyncStatistics.psm1'
+                'Get-ActiveSyncStatistics.psm1',
+                'Get-SmtpLogs.psm1'
 
 # Private data to pass to the module specified in ModuleToProcess
 PrivateData = ''
