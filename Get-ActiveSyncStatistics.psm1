@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (c) 201# Seth Wright <seth@crosse.org>
+# Copyright (c) 2013 Seth Wright <seth@crosse.org>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -87,6 +87,11 @@ function Get-ActiveSyncStatistics {
             $LogFileBasePath,
 
             [Parameter(Mandatory=$false)]
+            # Specifies that the LogFileBasePath should be recursed to find all files that meet the Start and End parameters.
+            [switch]
+            $Recurse,
+
+            [Parameter(Mandatory=$false)]
             # Specifies the maximum number of results to display.  By default, all results are displayed.
             [Nullable[int]]
             $ResultSize,
@@ -128,12 +133,17 @@ function Get-ActiveSyncStatistics {
             Write-Warning "Path not found: $path"
         } else {
             # Get a list of all files modified after $Start
-            $files = Get-ChildItem $path | Where-Object { 
+            $files = Get-ChildItem $path -File -Filter *.LOG -Recurse:$Recurse | Where-Object {
                 $_.LastWriteTime -gt $Start -and $_.LastWriteTime -lt $End
             }
             $logfiles += $files
         }
     }
+    if ($logfiles.Count -eq 0) {
+        Write-Error "No matching log files were found."
+        return
+    }
+
     Write-Verbose "Found $($logfiles.Count) total log files."
     $fromFiles += ($logfiles | % { $_.FullName }) -join ",`n    "
 
