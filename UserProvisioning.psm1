@@ -455,6 +455,25 @@ function Add-ProvisionedMailbox {
                 $resultObj.Error = $err
                 return $resultObj
             }
+
+            try {
+                # Set Audit Logging.
+                Write-Verbose "Enabling Audit Logging for $username"
+                Set-Mailbox -Identity $username `
+                            -AuditEnabled:$true `
+                            -AuditLogAgeLimit "90.00:00:00" `
+                            -AuditAdmin     Update, Copy, Move, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, MessageBind, Create `
+                            -AuditDelegate  Update, Move, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create `
+                            -AuditOwner     Update, Move, MoveToDeletedItems, SoftDelete, HardDelete `
+                            -DomainController $dc `
+                            -ErrorAction Stop
+            } catch {
+                $err =  "An error occurred while enabling audit logging.  The error was: $_"
+                Write-Error $err
+                $resultObj.Error = $err
+                return $resultObj
+            }
+
         } elseif ($MailboxLocation -eq 'Remote' -and $User.RecipientTypeDetails -eq 'User') {
             # Enable as MailUser.
             Write-Verbose "Enabling $username as a MailUser"
