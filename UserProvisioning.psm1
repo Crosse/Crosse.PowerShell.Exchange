@@ -438,10 +438,10 @@ function Add-ProvisionedMailbox {
         #   be enabled as a MailUser.
 
         if ($MailboxLocation -eq 'Local') {
-            # Enable as UserMailbox.
-            Write-Verbose "Enabling $username as a UserMailbox"
-
             try {
+                # Enable as UserMailbox.
+                Write-Verbose "Enabling $username as a UserMailbox"
+
                 # TODO:  Remove the JMU-specific bit about the ManagedFolderMailboxPolicy.
                 $User = Enable-Mailbox `
                             -Identity $username `
