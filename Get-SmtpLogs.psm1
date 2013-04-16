@@ -77,10 +77,20 @@ function Get-SmtpLogs {
     [CmdletBinding()]
     param (
             [Parameter(Mandatory=$true,
-                ParameterSetName="User")]
+                ParameterSetName="Client")]
+            [Parameter(Mandatory=$false,
+                ParameterSetName="Server")]
             [string]
-            # Specifies the username (without the domain) to search for.
+            # Specifies the client IP address to search for.
             $ClientIpAddress,
+
+            [Parameter(Mandatory=$true,
+                ParameterSetName="Server")]
+            [Parameter(Mandatory=$false,
+                ParameterSetName="Client")]
+            [string]
+            # Specifies the server IP address to search for.
+            $ServerIpAddress,
 
             [Parameter(Mandatory=$false)]
             # Specifies the start date and time to return details.  The date and time must be specified in local time and will be converted appropriately.
@@ -145,7 +155,11 @@ function Get-SmtpLogs {
     $fromFiles += ($logfiles | % { $_.FullName }) -join ",`n    "
 
     if ([String]::IsNullOrEmpty($ClientIpAddress) -eq $false) {
-        $whereIpAddress = "`n    AND ClientIpAddress  = '$ClientIpAddress'"
+        $clientAddr = "ClientIpAddress = '$ClientIpAddress' AND"
+    }
+
+    if ([String]::IsNullOrEmpty($ServerIpAddress) -eq $false) {
+        $serverAddr = "ServerIpAddress = '$ServerIpAddress' AND"
     }
 
     $formattedStartTime = $Start.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')
@@ -167,7 +181,8 @@ SELECT
 FROM
     $fromFiles
 WHERE
-    ClientIpAddress = '$ClientIpAddress' AND
+    $clientAddr
+    $serverAddr
     DateTime BETWEEN
         TO_TIMESTAMP('$formattedStartTime', 'yyyy-MM-dd HH:mm:ss') AND
         TO_TIMESTAMP('$formattedEndTime', 'yyyy-MM-dd HH:mm:ss')
