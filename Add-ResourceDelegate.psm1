@@ -223,6 +223,9 @@ function Add-ResourceDelegate {
             if ( $resourceType -eq 'SharedMailbox' ) {
                 $Subject += " (Shared Mailbox)"
                 $Template = $SharedMailboxTemplateEmail
+            } elseif ( $resourceType -eq 'UserMailbox' ) {
+                $Subject += " (User Mailbox)"
+                $Template = $SharedMailboxTemplateEmail
             } elseif ( $resourceType -eq 'EquipmentMailbox' ) {
                 $Subject += " (Equipment Resource)"
                 $Template = $ResourceMailboxTemplateEmail
