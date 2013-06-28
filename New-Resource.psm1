@@ -96,7 +96,9 @@ $alias = $DisplayName
 $alias = $alias.Replace('Conference Room', 'ConfRoom')
 $alias = $alias.Replace('Lecture Hall', 'LectureHall')
 $alias = $alias.Replace(' Hall', '')
+$alias = $alias.Replace(' - ', '_')
 $alias = $alias.Replace(' ', '_')
+$alias = $alias.Replace('#', '')
 if ($Shared -and !$Calendar) {
     $alias += "_Mailbox"
 }
