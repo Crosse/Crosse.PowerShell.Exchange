@@ -164,7 +164,8 @@ function Add-ResourceDelegate {
             Write-Verbose "Identifying invalid users in the GrantSendOnBehalfTo list"
             $dirty = $false
             foreach ($dn in $sobo) {
-                if ( (Get-Mailbox -Identity $dn -ErrorAction SilentlyContinue) -eq $null) {
+                $rtd = (Get-User -Identity $dn -ErrorAction SilentlyContinue).RecipientTypeDetails
+                if ( $rtd -ne 'MailUser' -and $rtd -ne 'UserMailbox' ) {
                     $dnsToRemove += $dn
                     $dirty = $true
                 }
