@@ -1,12 +1,5 @@
 ################################################################################
-# 
-# $Id$
-# 
-# DESCRIPTION:  Creates a new resource in accordance with JMU's current naming
-#               policies, etc.
-#
-# 
-# Copyright (c) 2009,2010 Seth Wright <wrightst@jmu.edu>
+# Copyright (c) 2009-2014 Seth Wright <wrightst@jmu.edu>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -22,258 +15,237 @@
 #
 ################################################################################
 
-param ( [string]$DisplayName, 
-        [string]$Owner, 
-        [switch]$Room,
-        [switch]$Equipment,
-        [switch]$Shared,
-        [switch]$Calendar,
-        [string]$PrimarySmtpAddress = "",
-        [switch]$EmailOwner=$true,
-        [switch]$Legacy=$false)
+function New-Resource {
+    [CmdletBinding(SupportsShouldProcess=$true,
+            ConfirmImpact="High")]
 
-# Change these to suit your environment
-$SmtpServer         = "it-exhub.ad.jmu.edu"
-$From               = "it-exmaint@jmu.edu"
-$Bcc                = "wrightst@jmu.edu, millerca@jmu.edu, najdziav@jmu.edu, eckardsl@jmu.edu"
-$Fqdn               = "exchange.jmu.edu"
-$BaseDN             = "ad.jmu.edu/ExchangeObjects"
+    param (
+            [Parameter(Mandatory=$true)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $DisplayName, 
 
-$cwd                = [System.IO.Path]::GetDirectoryName(($MyInvocation.MyCommand).Definition)
-$DomainController   = (gc Env:\LOGONSERVER).Replace('\', '')
-if ($DomainController -eq $null) { 
-    Write-Warning "Could not determine the local computer's logon server!"
-    return
-}
+            [Parameter(Mandatory=$true)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $Owner, 
+            
+            [Parameter(ParameterSetName='Resource',
+                Mandatory=$true)]
+            [switch]
+            $Room,
+            
+            [switch]
+            $Equipment,
+            
+            [switch]
+            $Shared,
+            
+            [switch]
+            $Calendar,
+            
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $PrimarySmtpAddress,
+            
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $BaseDN = "ad.jmu.edu/ExchangeObjects",
 
-if ( $DisplayName -eq '' -or $Owner -eq '') {
-    Write-Error "-DisplayName and -Owner are required"
-    return
-}
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $SmtpServer = "mailgw.jmu.edu",
 
-if ( !($Room -or $Equipment -or $Shared) ) {
-    Write-Error "Please specify either -Room, -Equipment, -Shared, or -Calendar"
-    return
-}
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $From = "Exchange System <it-exmaint@jmu.edu>",
 
-if (($Room -and $Equipment) -or ($Room -and $Shared) -or ($Equipment -and $Shared)) {
-    Write-Error "Please specify only one of -Room, -Equipment, or -Shared"
-    return
-}
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [string[]]
+            $Bcc = @("wrightst@jmu.edu", "richa3jb@jmu.edu", "eckardsl@jmu.edu"),
 
-if ( $Shared -and !($Calendar) -and ($PrimarySmtpAddress -eq "") ) {
-    Write-Error "Please specify the PrimarySmtpAddress"
-    return
-}
+            [switch]
+            $EmailOwner = $true,
 
-$Owner = Get-Mailbox $Owner
-if ($Owner -eq $null) {
-    Write-Error "Could not find owner"
-    return
-}
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [ValidateScript({ (Test-Path $_) })]
+            [string]
+            $SharedMailboxTemplateEmail = (Join-Path $PSScriptRoot "SharedMailboxDelegateTemplateEmail.html"),
 
-if ($Shared) {
-    $tempResource = Get-Mailbox -Anr $PrimarySMTPAddress
-    if ($tempResource -ne $null) {
-        Write-Error "The PrimarySmtpAddress already exists"
-        $tempResource
-        return
-    }
-}
-$ou = $BaseDN
-if  ( $Room ) {
-    $ou += "/Resources/Rooms"
-} elseif ( $Equipment ) {
-    $ou += "/Resources/Equipment"
-} elseif ( $Shared -and !$Calendar) {
-    $ou += "/SharedMailboxes"
-} elseif ( $Shared -and $Calendar) {
-    $ou += "/Resources/SharedCalendars"
-}
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [ValidateScript({ (Test-Path $_) })]
+            [string]
+            $ResourceMailboxTemplateEmail = (Join-Path $PSScriptRoot "ResourceMailboxDelegateTemplateEmail.html"),
 
-$Name  = $DisplayName
-$alias = $DisplayName
-$alias = $alias.Replace('Conference Room', 'ConfRoom')
-$alias = $alias.Replace('Lecture Hall', 'LectureHall')
-$alias = $alias.Replace(' Hall', '')
-$alias = $alias.Replace(' - ', '_')
-$alias = $alias.Replace(' ', '_')
-$alias = $alias.Replace('#', '')
-if ($Shared -and !$Calendar) {
-    $alias += "_Mailbox"
-}
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            $DomainController
+          )
 
-if ($Legacy) {
-    $Database = & "$cwd\Get-BestDatabase.ps1" IT-ExMbx1
-    if ($Database -eq $null) {
-        Write-Error "Could not find a suitable database!"
-        return
-    }
-}
+    BEGIN {
+        Write-Verbose "Performing initialization actions."
 
-$cmd  = "New-Mailbox -DomainController $DomainController "
-$cmd += "-OrganizationalUnit `"$ou`" -Name `"$Name`" -Alias `"$alias`" -UserPrincipalName "
-$cmd += "`"$($alias)@ad.jmu.edu`" -DisplayName `"$DisplayName`""
-$cmd += "-ManagedFolderMailboxPolicy 'Default Managed Folder Policy' -ManagedFolderMailboxPolicyAllowed:`$true "
-if ($Legacy) {
-    $cmd += "-Database `"$Database`""
-}
+        if ([String]::IsNullOrEmpty($DomainController)) {
+            $ForceRediscovery = [System.DirectoryServices.ActiveDirectory.LocatorOptions]::ForceRediscovery
+            while ($dc -eq $null) {
+                Write-Verbose "Finding a global catalog to use for this operation"
+                $controller = [System.DirectoryServices.ActiveDirectory.Domain]::`
+                    GetCurrentDomain().FindDomainController($ForceRediscovery)
+                if ($controller.IsGlobalCatalog() -eq $true) {
+                    Write-Verbose "Found $($controller.Name)"
+                    $dc = $controller.Name
+                } else {
+                    Write-Verbose "Discovered domain controller $($controller.Name) is not a global catalog; reselecting"
+                }
+            }
 
-$error.Clear()
-
-if ( $Room ) {
-    $cmd += " -Room"
-} elseif ( $Equipment ) {
-    $cmd += " -Equipment"
-} elseif ( $Shared ) {
-    $cmd += " -Shared"
-}
-
-Invoke-Expression($cmd)
-
-if (!([String]::IsNullOrEmpty($error[0]))) {
-    return
-}
-
-$resource = Get-Mailbox -DomainController $DomainController -Identity "$DisplayName"
-
-if ( !$resource) {
-    Write-Error "Could not find $alias in Active Directory."
-    return
-}
-
-# Send a message to the mailbox.  Somehow this helps...but sleep first.
-Write-Host "`nBlocking for 60 seconds for the mailbox to be created:"
-foreach ($i in 1..60) { 
-    if ($i % 10 -eq 0) {
-        Write-Host -NoNewLine "!"
-    } else {
-        Write-Host -NoNewLine "."
-    }
-    Start-Sleep 1
-}
-
-Write-Host "`ndone.`nSending a message to the resource to initialize the mailbox."
-& "$cwd\Send-Email.ps1" -From $From -To "$($resource.PrimarySMTPAddress)" -Subject "disregard" -Body "disregard" -SmtpServer $SmtpServer
-
-# Grant SendOnBehalfOf rights to the owner:
-$resource | Set-Mailbox -DomainController $DomainController `
-            -GrantSendOnBehalfTo $owner
-# Grant Send-As rights to the owner:
-$resource | Add-ADPermission -ExtendedRights "Send-As" -User $owner `
-            -DomainController $DomainController
-# Give the owner Full Access to the resource:
-$resource | Add-MailboxPermission -DomainController $DomainController `
-            -AccessRights FullAccess -User $Owner
-
-if ($Equipment -or $Room) {
-    # If this is a Resource mailbox and not a Shared mailbox...
-    # Set the default calendar settings on the resource.
-    # Unfortunately, this fails if the mailbox isn't fully created yet, so introduce a wait.
-    Write-Host "Setting Calendar Settings: "
-
-    foreach ($i in 1..10) {
-        $error.Clear()
-        $resource | Set-CalendarProcessing -DomainController $DomainController `
-                    -AllRequestOutOfPolicy:$True -AutomateProcessing AutoAccept `
-                    -BookingWindowInDays 365 -ResourceDelegates $owner `
-                    -ErrorAction SilentlyContinue
-        if (![String]::IsNullOrEmpty($error[0])) {
-            Write-Host -NoNewLine "."
-            Start-Sleep $i
+            if ($dc -eq $null) {
+                Write-Error "Could not find a domain controller to use for the operation."
+                continue
+            }
         } else {
-            Write-Host "done."
-            break
+            $dc = $DomainController
         }
-    }
-} elseif ( $Shared -and !$Calendar ) {
-        # Set the target mailbox's EmailAddresses property to include the PrimarySMTPAddress
-        # specified on the command line.
-        $emailAddresses = $resource.EmailAddresses
-        # Add the @jmu.edu address as the PrimarySmtpAddress
-        if (!($emailAddresses.Contains("SMTP:$($PrimarySmtpAddress)")) ) {
-            $emailAddresses.Add("SMTP:$($PrimarySmtpAddress)")
+    } # end 'BEGIN{}'
+
+    # This section executes for each object in the pipeline.
+    PROCESS {
+        if ( !($Room -or $Equipment -or $Shared) ) {
+            Write-Error "Please specify either -Room, -Equipment, -Shared, or -Calendar"
+            return
         }
 
-        $proxyAddress = $PrimarySmtpAddress.Replace("@jmu.edu", "@ad.jmu.edu")
-        if (!($emailAddresses.Contains("smtp:$($proxyAddress)")) ) {
-            $emailAddresses.Add("smtp:$($proxyAddress)")
+        if (($Room -and $Equipment) -or ($Room -and $Shared) -or ($Equipment -and $Shared)) {
+            Write-Error "Please specify only one of -Room, -Equipment, or -Shared"
+            return
         }
-        $resource | Set-Mailbox -EmailAddressPolicyEnabled:$False -EmailAddresses $emailAddresses `
-                    -DomainController $DomainController
-}
 
-if ($EmailOwner) {
-    $Title = "Information about Exchange resource `"$resource`""
-    if ( $Shared -and !$Calendar ) {
-        $Title += " (Shared Mailbox)"
-    } elseif ($Shared -and $Calendar ) {
-        $Title += " (Shared Calendar)"
-    } elseif ( $Equipment ) {
-        $Title += " (Equipment Resource)"
-    } elseif ( $Room ) {
-        $Title += " (Room Resource)"
+        if ( $Shared -and !$Calendar -and ($PrimarySmtpAddress -eq "") ) {
+            Write-Error "Please specify the PrimarySmtpAddress"
+            return
+        }
+
+        try {
+            $objUser = Get-User $Owner -DomainController $dc -ErrorAction Stop
+        } catch {
+            Write-Error -ErrorRecord $_
+            return
+        }
+
+        if ($Shared) {
+            $tempResource = Get-Recipient -Anr $PrimarySMTPAddress -DomainController $dc
+            if ($tempResource -ne $null) {
+                Write-Error "The PrimarySmtpAddress already exists:"
+                $tempResource
+                return
+            }
+        }
+
+        $ou = $BaseDN
+        if  ( $Room ) {
+            $ou += "/Resources/Rooms"
+        } elseif ( $Equipment ) {
+            $ou += "/Resources/Equipment"
+        } elseif ( $Shared -and !$Calendar) {
+            $ou += "/SharedMailboxes"
+        } elseif ( $Shared -and $Calendar) {
+            $ou += "/Resources/SharedCalendars"
+        }
+
+        $Name  = $DisplayName
+        $alias = $DisplayName
+        $alias = $alias.Replace('Conference Room', 'ConfRoom')
+        $alias = $alias.Replace('Lecture Hall', 'LectureHall')
+        $alias = $alias.Replace(' Hall', '')
+        $alias = $alias.Replace(' - ', '_')
+        $alias = $alias.Replace(' ', '_')
+        $alias = $alias.Replace('#', '')
+        if ($Shared -and !$Calendar) {
+            $alias += "_Mailbox"
+        }
+
+        $cmd  = "New-Mailbox -DomainController $dc "
+        $cmd += "-OrganizationalUnit `"$ou`" -Name `"$Name`" -Alias `"$alias`" -UserPrincipalName "
+        $cmd += "`"$($alias)@ad.jmu.edu`" -DisplayName `"$DisplayName`""
+        $cmd += "-ManagedFolderMailboxPolicy 'Default Managed Folder Policy' -ManagedFolderMailboxPolicyAllowed:`$true "
+
+        $error.Clear()
+
+        if ( $Room ) {
+            $cmd += " -Room"
+        } elseif ( $Equipment ) {
+            $cmd += " -Equipment"
+        } elseif ( $Shared ) {
+            $cmd += " -Shared"
+        }
+
+        Invoke-Expression($cmd)
+
+        if (!([String]::IsNullOrEmpty($error[0]))) {
+            return
+        }
+
+        $resource = Get-Mailbox -DomainController $dc -Identity "$DisplayName"
+
+        if ( !$resource) {
+            Write-Error "Could not find $alias in Active Directory."
+            return
+        }
+
+        # Send a message to the mailbox.  Somehow this helps...but sleep first.
+        Write-Host "`nBlocking for 60 seconds for the mailbox to be created:"
+        foreach ($i in 1..60) { 
+            if ($i % 10 -eq 0) {
+                Write-Host -NoNewLine "!"
+            } else {
+                Write-Host -NoNewLine "."
+            }
+            Start-Sleep 1
+        }
+
+        Write-Host "`ndone.`nSending a message to the resource to initialize the mailbox."
+        Send-MailMessage -From $From -To "$($resource.PrimarySMTPAddress)" -Subject "disregard" -Body "disregard" -SmtpServer $SmtpServer
+
+        if ($Equipment -or $Room) {
+            # If this is a Resource mailbox and not a Shared mailbox...
+            # Set the default calendar settings on the resource.
+            # Unfortunately, this fails if the mailbox isn't fully created yet, so introduce a wait.
+            Write-Host "Setting Calendar Settings: "
+
+            foreach ($i in 1..10) {
+                $error.Clear()
+                $resource | Set-CalendarProcessing -DomainController $dc `
+                            -AllRequestOutOfPolicy:$True -AutomateProcessing AutoAccept `
+                            -BookingWindowInDays 365 -ErrorAction SilentlyContinue
+                if (![String]::IsNullOrEmpty($error[0])) {
+                    Write-Host -NoNewLine "."
+                    Start-Sleep $i
+                } else {
+                    Write-Host "done."
+                    break
+                }
+            }
+        } elseif ( $Shared -and !$Calendar ) {
+                # Set the target mailbox's EmailAddresses property to include the PrimarySMTPAddress
+                # specified on the command line.
+                $emailAddresses = $resource.EmailAddresses
+                # Add the @jmu.edu address as the PrimarySmtpAddress
+                if (!($emailAddresses.Contains("SMTP:$($PrimarySmtpAddress)")) ) {
+                    $emailAddresses.Add("SMTP:$($PrimarySmtpAddress)")
+                }
+
+                $resource | Set-Mailbox -EmailAddressPolicyEnabled:$False -EmailAddresses $emailAddresses `
+                            -DomainController $DomainController
+        }
+
+        Add-ResourceDelegate -ResourceIdentity $resource -Delegate $objUser -DomainController $dc
     }
-
-    $To = (Get-Mailbox $Owner).PrimarySmtpAddress.ToString()
-
-    $Body = @"
-You have been identified as a resource owner / delegate for the
-following Exchange resource:
-
-    $resource`n
-
-"@
-
-    if ($Equipment -or $Room) {
-        $Body += @"
-This email is to inform you about the booking policy for this resource,
-and how you can change it if the defaults do not suit the resource.
-Currently, the resource will automatically accept booking requests
-that do not conflict with other bookings, and will require your approval
-if a request is made that conflicts with another booking.
-
-If you would like to change this behavior, you may do so by using
-Outlook Web Access (OWA).  Open Internet Explorer and navigate to the
-following URL:`n
-"@
-    }
-
-    if ( $Shared ) {
-        $Body += @"
-You may use either Outlook or Outlook Web Access (OWA) to access this 
-resource.  If you would like to use OWA, open Internet Explorer and
-navigate to the following URL:`n
-"@
-    }
-
-    $Body += @"
-
-    https://$($Fqdn)/owa/$($resource.PrimarySMTPAddress)`n
-
-(Log in using your own e-ID and password.)`n
-
-"@
-
-    if ($Equipment -or $Room) {
-        $Body += @"
-Click on the Options link in the upper-right-hand corner, then click the
-"Resource Settings" option in the left-hand column.  Most of the options
-should be self-explanatory.  For instance, if you would like to alter
-the settings of this resource such that no user can automatically book
-it, and that every request must be approved, simply change both settings
-that start with "These users can schedule automatically..." to "Select
-users and groups" instead of "Everyone", and set "These users can submit
-a request for manual approval..." to "Everyone".`n
-
-"@
-}
-
-    $Body += @"
-If you have any questions, please contact the JMU Computing HelpDesk at
-helpdesk@jmu.edu, or by phone at 540-568-3555.
-"@
-
-    & "$cwd\Send-Email.ps1" -From $From -To $To -Bcc $Bcc -Subject $Title -Body $Body -SmtpServer $SmtpServer
-    Write-Host "Sent message to $To for resource `"$resource`""
 }
