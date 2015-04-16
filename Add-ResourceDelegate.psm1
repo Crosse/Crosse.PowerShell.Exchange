@@ -113,7 +113,7 @@ function Add-ResourceDelegate {
     # This section executes for each object in the pipeline.
     PROCESS {
         try {
-            $objUser = Get-User $Delegate -DomainController $dc -ErrorAction Stop
+            $objUser = Get-Recipient $Delegate -DomainController $dc -ErrorAction Stop
         } catch {
             Write-Error -ErrorRecord $_
             return
