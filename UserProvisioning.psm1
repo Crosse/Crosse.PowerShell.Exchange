@@ -563,7 +563,7 @@ function Add-ProvisionedMailbox {
                     $emailDetails = New-EmailDetailsObject `
                                         -Identity $User.Name `
                                         -Address $User.ExternalEmailAddress.SmtpAddress `
-                                        -Subject "You now have a JMU Live@edu Dukes E-mail Account"
+                                        -Subject "You now have a JMU Dukes E-mail Account"
                     $emailDetails.MessageBody = Resolve-TemplatedEmail `
                                         -FilePath $RemoteWelcomeEmailTemplate `
                                         -ToBase64String `
@@ -577,7 +577,7 @@ function Add-ProvisionedMailbox {
                     $emailDetails = New-EmailDetailsObject `
                                         -Identity $User.Name `
                                         -Address $contact.ExternalEmailAddress.SmtpAddress `
-                                        -Subject "You now have a JMU Live@edu Dukes E-mail Account"
+                                        -Subject "You now have a JMU Dukes E-mail Account"
                     $emailDetails.MessageBody = Resolve-TemplatedEmail `
                                         -FilePath $RemoteWelcomeEmailTemplate `
                                         -ToBase64String `
@@ -591,7 +591,7 @@ function Add-ProvisionedMailbox {
                     $emailDetails = New-EmailDetailsObject `
                                         -Identity $User.Name `
                                         -Address $User.PrimarySmtpAddress.ToString() `
-                                        -Subject "You now have a JMU Live@edu Dukes E-mail Account"
+                                        -Subject "You now have a JMU Dukes E-mail Account"
                     $emailDetails.MessageBody = Resolve-TemplatedEmail `
                                         -FilePath $RemoteNotificationEmailTemplate `
                                         -ToBase64String `
