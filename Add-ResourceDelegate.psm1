@@ -57,7 +57,7 @@ function Add-ResourceDelegate {
             $Bcc = @("wrightst@jmu.edu", "richa3jb@jmu.edu", "eckardsl@jmu.edu"),
 
             [switch]
-            $EmailDelegate=$true,
+            $EmailDelegate = $true,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
