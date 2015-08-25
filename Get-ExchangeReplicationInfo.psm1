@@ -26,17 +26,22 @@ function Get-ExchangeReplicationInfo {
             $QueueLengthThreshold = 10
         )
 
-    $eapref = $ErrorActionPreference
-    try {
-        $status = Get-MailboxDatabase | Get-MailboxDatabaseCopyStatus
-    } catch {
-        $e = $_
-        $ErrorActionPreference = $eapref
-        throw $e
+    Write-Verbose "Getting a list of all databases"
+    $databases = Get-MailboxDatabase
+    foreach ($db in $databases) {
+        $ok = $true
+        $copies = Get-MailboxDatabaseCopyStatus -Identity $db.Name
+        foreach ($copy in $copies) {
+            if (($copy.Status -ne "Healthy" -and $copy.Status -ne "Mounted") -or
+                 $copy.ContentIndexState -ne "Healthy" -or
+                 $copy.CopyQueueLength -gt $QueueLengthThreshold -or
+                 $copy.ReplayQueueLength -gt $QueueLengthThreshold) {
+                $copy
+                $ok = $false
+            }
+        }
+        if ($ok) {
+            Write-Verbose "Database $db is healthy"
+        }
     }
-
-    $status | ? {   $_.CopyQueueLength -gt $QueueLengthThreshold -or
-                    $_.ReplayQueueLength -gt $QueueLengthThreshold -or
-                    ($_.Status -ne "Healthy" -and $_.Status -ne "Mounted") -or
-                    $_.ContentIndexState -ne "Healthy" }
 }
