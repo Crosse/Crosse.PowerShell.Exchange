@@ -24,39 +24,48 @@ function Add-ResourceDelegate {
             [Alias("Identity")]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The identity of the resource.
             $ResourceIdentity,
 
             [Parameter(Mandatory=$true,
                 ValueFromPipeline=$true)]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The identity of the delegate to add to the resource.
             $Delegate,
 
             [switch]
+            # Whether to grant full access to the resource.  Default is true.
             $GrantFullMailboxAccess = $true,
 
             [switch]
+            # Whether to grand Send-As rights to the resource.  Default is true.
             $GrantSendAs = $true,
 
             [switch]
+            # Whether to grant Send-On-Behalf rights to the resource.  Default is true.
             $GrantSendOnBehalfTo = $true,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The SMTP server used to when sending email.
             $SmtpServer = "mailgw.jmu.edu",
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The From address used when sending email.
             $From = "Exchange System <it-exmaint@jmu.edu>",
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string[]]
+            # An array of email addresses to BCC when sending email to owners.
             $Bcc = @("wrightst@jmu.edu", "richa3jb@jmu.edu", "eckardsl@jmu.edu"),
 
             [switch]
+            # Whether to email the delegate.  Default is true.
             $EmailDelegate = $true,
 
             [Parameter(Mandatory=$false)]
@@ -74,6 +83,7 @@ function Add-ResourceDelegate {
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The domain controller to target for all operations.
             $DomainController
           )
 
