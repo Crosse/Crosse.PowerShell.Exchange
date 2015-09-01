@@ -65,7 +65,6 @@ function Get-MailboxDatabaseStatistics {
                         EdbFileSize         = $null
                         AvailableSpace      = $null
                         CommitPercent       = $null
-                        FullBackupInPast24H = $false
                         LastFullBackup      = $null
                         CILastModifiedTime  = @()
                         ServerStatus        = @()
@@ -77,9 +76,6 @@ function Get-MailboxDatabaseStatistics {
         }
 
         $dbInfo.LastFullBackup = $db.LastFullBackup
-        if ($db.LastFullBackup -gt (Get-Date).AddDays(-1)) {
-            $dbInfo.FullBackupInPast24H = $true
-        }
 
         for ($c = 0; $c -lt @($db.DatabaseCopies).Count; $c++) {
             $copy = $db.DatabaseCopies[$c]
