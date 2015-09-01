@@ -115,10 +115,10 @@ function Get-MailboxDatabaseStatistics {
             $ciUncPath = "\\" + $server + "\" + $ciPath + "\CatalogData-" + $guid + "*"
             $ciUncPath = Resolve-Path $ciUncPath
             if ($ciUncPath -eq $null) {
-                $ciLastModifiedTime = 
-                    New-Object PSObject -Property @{ Server = $server; LastModifiedTime = [DateTime]::MinValue } 
+                $ciLastModifiedTime =
+                    New-Object PSObject -Property @{ Server = $server; LastModifiedTime = [DateTime]::MinValue }
             } else {
-                $ciLastModifiedTime = 
+                $ciLastModifiedTime =
                     New-Object PSObject -Property @{ Server = $server; LastModifiedTime = (Get-Item $ciUncPath).LastWriteTime }
             }
             $dbInfo.CILastModifiedTime += $ciLastModifiedTime
