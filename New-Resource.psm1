@@ -250,6 +250,44 @@ function New-Resource {
         if ($Equipment -or $Room) {
             # If this is a Resource mailbox and not a Shared mailbox...
 
+            # Set the default mailbox quota limits.
+            $timeout = 60 ; $i = 0
+            $activity = "Setting mailbox defaults"
+            $status = "Setting mailbox quota defaults"
+            for ($i = 0; $i -lt $timeout; $i++) {
+                [Int32]$pct = [Math]::Round($i*100/$timeout, 0)
+                Write-Progress -Activity $activity -Status $status `
+                    -CurrentOperation "Attempt $i" `
+                    -SecondsRemaining ($timeout - $i) -PercentComplete $pct
+
+                try {
+                    Write-Verbose "Attempting to set mailbox quota and auditing defaults"
+
+                    $auditOwner = @("Update", "Move", "MoveToDeletedItems", "SoftDelete", "HardDelete")
+                    $auditDelegate = $auditOwner + @("SendAs", "SendOnBehalf", "Create")
+                    $auditAdmin = $auditDelegate + @("Copy", "MessageBind")
+                    $resource | Set-Mailbox -DomainController $dc `
+                                -IssueWarningQuota 90MB `
+                                -ProhibitSendQuota 95MB `
+                                -ProhibitSendReceiveQuota 100MB `
+                                -UseDatabaseQuotaDefaults:$false `
+                                -AuditEnabled:$true `
+                                -AuditLogAgeLimit "90.00:00:00" `
+                                -AuditOwner $auditOwner `
+                                -AuditDelegate $auditDelegate `
+                                -AuditAdmin $auditAdmin `
+                                -ErrorAction Stop
+                    break
+                } catch {
+                    #Write-Warning $_
+                    Start-Sleep 1
+                }
+            }
+            Write-Progress -Activity $activity -Status $status -Completed
+            if ($i -eq $timeout) {
+                Write-Error "Unable to set quota defaults!"
+            }
+
             $timeout = 120 ; $i = 0
             $activity = "Setting mailbox defaults"
             $status = "Setting calendaring defaults"
