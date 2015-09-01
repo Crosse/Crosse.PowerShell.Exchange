@@ -100,12 +100,15 @@ function New-Resource {
     BEGIN {
         Write-Verbose "Performing initialization actions."
 
+        $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+        $controllers = @($domain.DomainControllers | % { $_.Name.ToLower() })
+        $controllersCount = $controllers.Count
+        Write-Verbose "Found $controllersCount domain controllers."
         if ([String]::IsNullOrEmpty($DomainController)) {
             $ForceRediscovery = [System.DirectoryServices.ActiveDirectory.LocatorOptions]::ForceRediscovery
             while ($dc -eq $null) {
                 Write-Verbose "Finding a global catalog to use for this operation"
-                $controller = [System.DirectoryServices.ActiveDirectory.Domain]::`
-                    GetCurrentDomain().FindDomainController($ForceRediscovery)
+                $controller = $domain.FindDomainController($ForceRediscovery)
                 if ($controller.IsGlobalCatalog() -eq $true) {
                     Write-Verbose "Found $($controller.Name)"
                     $dc = $controller.Name
@@ -207,16 +210,36 @@ function New-Resource {
             return
         }
 
-        # Send a message to the mailbox.  Somehow this helps...but sleep first.
-        Write-Host "`nBlocking for 60 seconds for the mailbox to be created:"
-        foreach ($i in 1..60) { 
-            if ($i % 10 -eq 0) {
-                Write-Host -NoNewLine "!"
-            } else {
-                Write-Host -NoNewLine "."
+
+        $timeout = 60
+        $waitingOn = $controllers.Count
+        $foundOn = "no domain controllers yet"
+        $activity =  "Waiting for AD replication..."
+        $status = "Waiting on $waitingOn domain controllers"
+        for ($i = 0; $i -lt $timeout; $i++) {
+            [Int32]$pct = [Math]::Round($i*100/$timeout, 0)
+            Write-Progress -Activity $activity -Status $status `
+                -CurrentOperation "Replicated to $foundOn" `
+                -SecondsRemaining ($timeout - $i) -PercentComplete $pct
+
+            if ($waitingOn -gt 0) {
+                $waitingOn = $controllers.Count
+                $replicated = @()
+                foreach ($c in $controllers) {
+                    $mbx = Get-ADAttribute -DomainController $c `
+                                           -Identity $resource.UserPrincipalName `
+                                           -Attribute msExchMailboxGuid `
+                                           -ErrorAction SilentlyContinue
+                    if ($mbx -ne $null -and $mbx.msExchMailboxGuid -ne $null) {
+                        $replicated += $c.ToLower() -replace ".$($domain.Name.ToLower())", ""
+                        $waitingOn--
+                    }
+                }
+                $foundOn = $replicated -join ", "
             }
             Start-Sleep 1
         }
+        Write-Progress -Activity "Waiting for AD replication..." -Status "Completed" -PercentComplete 100 -Completed
 
         Write-Host "`ndone.`nSending a message to the resource to initialize the mailbox."
         Send-MailMessage -From $From -To "$($resource.PrimarySMTPAddress)" -Subject "disregard" -Body "disregard" -SmtpServer $SmtpServer
