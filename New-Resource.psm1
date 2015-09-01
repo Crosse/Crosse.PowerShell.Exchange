@@ -289,5 +289,7 @@ function New-Resource {
             -EmailDelegate:$EmailOwner `
             -SmtpServer $SmtpServer -From $From -Bcc $Bcc `
             -Confirm:$Confirm -Verbose:$Verbose
+
+        return (Get-Mailbox -DomainController $dc -Identity $resource)
     }
 }
