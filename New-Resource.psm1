@@ -129,7 +129,6 @@ function New-Resource {
         }
     } # end 'BEGIN{}'
 
-    # This section executes for each object in the pipeline.
     PROCESS {
         if ( !($Room -or $Equipment -or $Shared) ) {
             Write-Error "Please specify either -Room, -Equipment, -Shared, or -Calendar"
