@@ -70,11 +70,13 @@ function Add-ResourceDelegate {
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The full path to a template to use when sending emails to delegates for resource mailboxes.
             $ResourceMailboxTemplate = (Join-Path $PSScriptRoot "ResourceMailboxDelegateTemplateEmail.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The full path to a template to use when sending emails to delegates for shared mailboxes.
             $SharedMailboxTemplate = (Join-Path $PSScriptRoot "SharedMailboxDelegateTemplateEmail.html"),
 
             [Parameter(Mandatory=$false)]
