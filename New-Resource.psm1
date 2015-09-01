@@ -53,30 +53,36 @@ function New-Resource {
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
-            $PrimarySmtpAddress,
-            
-            [Parameter(Mandatory=$false)]
-            [ValidateNotNullOrEmpty()]
-            [string]
-            $BaseDN = "ad.jmu.edu/ExchangeObjects",
+            # For shared mailboxes, the SMTP address to set.
+            $PrimarySmtpAddress = "",
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
-            $SmtpServer = "mailgw.jmu.edu",
+            # The base "ExchangeObjects" OU.  Defaults to "<current.domain.local>/ExchangeObjects"
+            $BaseDN,
+
+            [switch]
+            # Whether to email the owner.  Default is true.
+            $EmailOwner=$true,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
-            $From = "Exchange System <it-exmaint@jmu.edu>",
+            # The SMTP server used to when sending email.
+            $SmtpServer,
+
+            [Parameter(Mandatory=$false)]
+            [ValidateNotNullOrEmpty()]
+            [string]
+            # The From address used when sending email.
+            $From,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string[]]
-            $Bcc = @("wrightst@jmu.edu", "richa3jb@jmu.edu", "eckardsl@jmu.edu"),
-
-            [switch]
-            $EmailOwner = $true,
+            # An array of email addresses to BCC when sending email to owners.
+            $Bcc,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
