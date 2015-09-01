@@ -274,7 +274,7 @@ function New-Resource {
                 }
 
                 $resource | Set-Mailbox -EmailAddressPolicyEnabled:$False -EmailAddresses $emailAddresses `
-                            -DomainController $DomainController
+                            -DomainController $dc
         }
 
         Add-ResourceDelegate -ResourceIdentity $resource -Delegate $Owner -DomainController $dc
