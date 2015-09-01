@@ -263,6 +263,7 @@ function Add-ResourceDelegate {
 
             $To = (Get-Recipient $objUser.Identity).PrimarySmtpAddress.ToString()
 
+            Write-Verbose "Template:  $Template"
             $MessageBody = Resolve-TemplatedEmail `
                             -FilePath $Template `
                             -TemplateSubstitutions @{
