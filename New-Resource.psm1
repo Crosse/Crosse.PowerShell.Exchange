@@ -23,7 +23,8 @@ function New-Resource {
             [Parameter(Mandatory=$true)]
             [ValidateNotNullOrEmpty()]
             [string]
-            $DisplayName, 
+            # The name of the new resource as it will appear in the GAL.
+            $DisplayName,
 
             [Parameter(Mandatory=$true)]
             [ValidateNotNullOrEmpty()]
@@ -33,15 +34,19 @@ function New-Resource {
             [Parameter(ParameterSetName='Resource',
                 Mandatory=$true)]
             [switch]
+            # This resource is a room resource.
             $Room,
             
             [switch]
+            # This resource is an equipment resource.
             $Equipment,
             
             [switch]
+            # This resource is a shared mailbox or a shared calendar.
             $Shared,
             
             [switch]
+            # This resource is a shared calendar.
             $Calendar,
             
             [Parameter(Mandatory=$false)]
@@ -87,6 +92,7 @@ function New-Resource {
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
+            # The domain controller to target for all operations.
             $DomainController
           )
 
