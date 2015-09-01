@@ -100,6 +100,9 @@ function New-Resource {
     BEGIN {
         Write-Verbose "Performing initialization actions."
 
+        $Confirm = ($PSBoundParameters["Confirm"] -eq $null -or $PSBoundParameters["Confirm"].ToBool())
+        $Verbose = ($PSBoundParameters["Verbose"] -eq $null -or $PSBoundParameters["Verbose"].ToBool())
+
         $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
         $controllers = @($domain.DomainControllers | % { $_.Name.ToLower() })
         $controllersCount = $controllers.Count
