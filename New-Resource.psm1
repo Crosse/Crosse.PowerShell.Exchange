@@ -270,6 +270,10 @@ function New-Resource {
                     $emailAddresses.Add("SMTP:$($PrimarySmtpAddress)")
                 }
 
+                $proxyAddress = $PrimarySmtpAddress.Replace("@jmu.edu", "@ad.jmu.edu")
+                if (!($emailAddresses.Contains("smtp:$($proxyAddress)")) ) {
+                    $emailAddresses.Add("smtp:$($proxyAddress)")
+                }
                 $resource | Set-Mailbox -EmailAddressPolicyEnabled:$False -EmailAddresses $emailAddresses `
                             -DomainController $dc
         }
