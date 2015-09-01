@@ -242,7 +242,7 @@ function New-Resource {
         }
         Write-Progress -Activity "Waiting for AD replication..." -Status "Completed" -PercentComplete 100 -Completed
 
-        Write-Host "`ndone.`nSending a message to the resource to initialize the mailbox."
+        Write-Verbose "Sending a message to the resource to initialize the mailbox."
         Send-MailMessage -From $From -To "$($resource.PrimarySMTPAddress)" -Subject "disregard" -Body "disregard" -SmtpServer $SmtpServer
 
         if ($Equipment -or $Room) {
