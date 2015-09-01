@@ -115,7 +115,7 @@ function Add-ProvisionedMailbox {
             [ValidateNotNullOrEmpty()]
             [string]
             # Where to create MailContact objects, if necessary.
-            $MailContactOrganizationalUnit="ExchangeObjects/MailContacts"
+            $MailContactOrganizationalUnit="ExchangeObjects/DukesContacts"
         )
 
     # This section executes only once, before the pipeline.
