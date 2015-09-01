@@ -49,7 +49,7 @@ function New-Resource {
             [switch]
             # This resource is a shared calendar.
             $Calendar,
-            
+
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
