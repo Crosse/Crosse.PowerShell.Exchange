@@ -204,7 +204,7 @@ function Add-ResourceDelegate {
 
         if ($GrantSendOnBehalfTo) {
             # Grant SendOnBehalfOf rights to the owner, if appropriate
-            if ($objUser.RecipientType -match 'MailUser' -or $objUser.RecipientType -match 'UserMailbox') {
+            if ($objUser.RecipientType -match 'MailUser' -or $objUser.RecipientType -match 'UserMailbox' -or $objUser.RecipientType -match 'Group') {
                 if ( !$sobo.Contains($objUser.DistinguishedName) ) {
                     $null = $sobo.Add( $objUser.DistinguishedName )
                     $dirty = $true
