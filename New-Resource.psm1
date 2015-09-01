@@ -37,15 +37,15 @@ function New-Resource {
             [switch]
             # This resource is a room resource.
             $Room,
-            
+
             [switch]
             # This resource is an equipment resource.
             $Equipment,
-            
+
             [switch]
             # This resource is a shared mailbox or a shared calendar.
             $Shared,
-            
+
             [switch]
             # This resource is a shared calendar.
             $Calendar,
@@ -107,6 +107,7 @@ function New-Resource {
         $controllers = @($domain.DomainControllers | % { $_.Name.ToLower() })
         $controllersCount = $controllers.Count
         Write-Verbose "Found $controllersCount domain controllers."
+
         if ([String]::IsNullOrEmpty($DomainController)) {
             $ForceRediscovery = [System.DirectoryServices.ActiveDirectory.LocatorOptions]::ForceRediscovery
             while ($dc -eq $null) {
@@ -177,6 +178,7 @@ function New-Resource {
         $alias = $alias.Replace('Lecture Hall', 'LectureHall')
         $alias = $alias.Replace(' Hall', '')
         $alias = $alias -replace '[\s-#&()]+', '_'
+
         if ($Shared -and !$Calendar) {
             $alias += "_Mailbox"
         }
