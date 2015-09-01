@@ -29,11 +29,11 @@ function New-Resource {
 
             [Parameter(Mandatory=$true)]
             [ValidateNotNullOrEmpty()]
+            [Alias("Owner")]
             [string]
-            $Owner, 
-            
-            [Parameter(ParameterSetName='Resource',
-                Mandatory=$true)]
+            # The owner of the new resource.
+            $Delegate,
+
             [switch]
             # This resource is a room resource.
             $Room,
@@ -145,10 +145,9 @@ function New-Resource {
             return
         }
 
-        try {
-            $objUser = Get-User $Owner -DomainController $dc -ErrorAction Stop
-        } catch {
-            Write-Error -ErrorRecord $_
+        $Owner = Get-Mailbox $Delegate
+        if ($Owner -eq $null) {
+            Write-Error "Could not find owner $Delegate"
             return
         }
 
@@ -276,6 +275,6 @@ function New-Resource {
                             -DomainController $DomainController
         }
 
-        Add-ResourceDelegate -ResourceIdentity $resource -Delegate $objUser -DomainController $dc
+        Add-ResourceDelegate -ResourceIdentity $resource -Delegate $Owner -DomainController $dc
     }
 }
