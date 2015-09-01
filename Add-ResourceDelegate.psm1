@@ -69,13 +69,11 @@ function Add-ResourceDelegate {
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
-            [ValidateScript({ (Test-Path $_) })]
             [string]
             $SharedMailboxTemplateEmail = (Join-Path $PSScriptRoot "SharedMailboxDelegateTemplateEmail.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
-            [ValidateScript({ (Test-Path $_) })]
             [string]
             $ResourceMailboxTemplateEmail = (Join-Path $PSScriptRoot "ResourceMailboxDelegateTemplateEmail.html"),
 
@@ -88,6 +86,23 @@ function Add-ResourceDelegate {
 
     BEGIN {
         Write-Verbose "Performing initialization actions."
+
+        #if ([String]::IsNullOrEmpty($SharedMailboxTemplate)) {
+        #    $SharedMailboxTemplate = Join-Path $PSScriptRoot "SharedMailboxDelegateTemplateEmail.html"
+        #}
+        Write-Verbose "Using Shared Mailbox Template `"$SharedMailboxTemplate`""
+        #if ([String]::IsNullOrEmpty($ResourceMailboxTemplate)) {
+        #    $ResourceMailboxTemplate = Join-Path $PSScriptRoot "ResourceMailboxDelegateTemplateEmail.html"
+        #}
+        Write-Verbose "Using Resource Mailbox Template `"$ResourceMailboxTemplate`""
+
+
+        if ((Test-Path $SharedMailboxTemplate) -eq $false) {
+            throw "SharedMailboxTemplate path `"$SharedMailboxTemplate`" does not exist."
+        }
+        if ((Test-Path $ResourceMailboxTemplate) -eq $false) {
+            throw "ResourceMailboxTemplate path `"$ResourceMailboxTemplate`" does not exist."
+        }
 
         if ([String]::IsNullOrEmpty($DomainController)) {
             $ForceRediscovery = [System.DirectoryServices.ActiveDirectory.LocatorOptions]::ForceRediscovery
