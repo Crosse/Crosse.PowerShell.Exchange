@@ -46,6 +46,9 @@ function Add-ResourceDelegate {
             # Whether to grant Send-On-Behalf rights to the resource.  Default is true.
             $GrantSendOnBehalfTo = $true,
 
+            [switch]
+            # Whether to email the delegate.  Default is true.
+            $EmailDelegate = $true,
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
@@ -63,10 +66,6 @@ function Add-ResourceDelegate {
             [string[]]
             # An array of email addresses to BCC when sending email to owners.
             $Bcc = @("wrightst@jmu.edu", "richa3jb@jmu.edu", "eckardsl@jmu.edu"),
-
-            [switch]
-            # Whether to email the delegate.  Default is true.
-            $EmailDelegate = $true,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
