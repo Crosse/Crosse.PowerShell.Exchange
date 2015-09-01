@@ -49,23 +49,24 @@ function Add-ResourceDelegate {
             [switch]
             # Whether to email the delegate.  Default is true.
             $EmailDelegate = $true,
+
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
             # The SMTP server used to when sending email.
-            $SmtpServer = "mailgw.jmu.edu",
+            $SmtpServer,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
             # The From address used when sending email.
-            $From = "Exchange System <it-exmaint@jmu.edu>",
+            $From,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string[]]
             # An array of email addresses to BCC when sending email to owners.
-            $Bcc = @("wrightst@jmu.edu", "richa3jb@jmu.edu", "eckardsl@jmu.edu"),
+            $Bcc,
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
