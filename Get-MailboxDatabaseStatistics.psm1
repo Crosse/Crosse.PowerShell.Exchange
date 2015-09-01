@@ -176,6 +176,13 @@ function Get-MailboxDatabaseStatistics {
         $i++
         Write-Progress -Activity "Gathering Database Statistics" -Status "Finished" -Id 1 -Completed
 
+        Write-Verbose "Database Name: $($dbInfo.Identity)"
+        Write-Verbose "Database Size: $($dbInfo.EdbFileSizeInGB)"
+        Write-Verbose "Database Available Space: $($dbInfo.AvailableSpaceInMB)MB"
+        Write-Verbose "Database Commit %: $($dbInfo.CommitPercent)"
+        Write-Verbose "Database Last Full Backup: $($dbInfo.LastFullBackup)"
+        Write-Verbose "Database Backup Status: $($dbInfo.BackupStatus)"
+        Write-Verbose "Database Mounted on:  $($dbInfo.MountedOnServer)"
 
         return $dbInfo
     }
