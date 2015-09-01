@@ -86,18 +86,6 @@ function New-Resource {
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
-            [ValidateScript({ (Test-Path $_) })]
-            [string]
-            $SharedMailboxTemplateEmail = (Join-Path $PSScriptRoot "SharedMailboxDelegateTemplateEmail.html"),
-
-            [Parameter(Mandatory=$false)]
-            [ValidateNotNullOrEmpty()]
-            [ValidateScript({ (Test-Path $_) })]
-            [string]
-            $ResourceMailboxTemplateEmail = (Join-Path $PSScriptRoot "ResourceMailboxDelegateTemplateEmail.html"),
-
-            [Parameter(Mandatory=$false)]
-            [ValidateNotNullOrEmpty()]
             [string]
             # The domain controller to target for all operations.
             $DomainController
@@ -283,6 +271,11 @@ function New-Resource {
                             -DomainController $dc
         }
 
-        Add-ResourceDelegate -ResourceIdentity $resource -Delegate $Owner -DomainController $dc
+        Write-Verbose "Adding $Owner as a delegate"
+        Add-ResourceDelegate -DomainController $dc `
+            -ResourceIdentity $resource -Delegate $Owner `
+            -EmailDelegate:$EmailOwner `
+            -SmtpServer $SmtpServer -From $From -Bcc $Bcc `
+            -Confirm:$Confirm -Verbose:$Verbose
     }
 }
