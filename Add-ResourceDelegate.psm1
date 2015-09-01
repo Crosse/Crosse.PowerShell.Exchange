@@ -174,6 +174,7 @@ function Add-ResourceDelegate {
                 $null = Add-MailboxPermission -Identity $resource `
                             -User $objUser.Identity `
                             -AccessRights FullAccess `
+                            -InheritanceType All `
                             -AutoMapping:$false `
                             -DomainController $dc `
                             -ErrorAction Stop
