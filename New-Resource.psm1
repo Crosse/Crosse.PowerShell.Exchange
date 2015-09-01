@@ -249,22 +249,33 @@ function New-Resource {
 
         if ($Equipment -or $Room) {
             # If this is a Resource mailbox and not a Shared mailbox...
-            # Set the default calendar settings on the resource.
-            # Unfortunately, this fails if the mailbox isn't fully created yet, so introduce a wait.
-            Write-Host "Setting Calendar Settings: "
 
-            foreach ($i in 1..10) {
-                $error.Clear()
-                $resource | Set-CalendarProcessing -DomainController $dc `
-                            -AllRequestOutOfPolicy:$True -AutomateProcessing AutoAccept `
-                            -BookingWindowInDays 365 -ErrorAction SilentlyContinue
-                if (![String]::IsNullOrEmpty($error[0])) {
-                    Write-Host -NoNewLine "."
-                    Start-Sleep $i
-                } else {
-                    Write-Host "done."
+            $timeout = 120 ; $i = 0
+            $activity = "Setting mailbox defaults"
+            $status = "Setting calendaring defaults"
+            # Set the default calendar settings on the resource.
+            for ($i = 0; $i -lt $timeout; $i++) {
+                [Int32]$pct = [Math]::Round($i*100/$timeout, 0)
+                Write-Progress -Activity $activity -Status $status `
+                    -CurrentOperation "Attempt $i" `
+                    -SecondsRemaining ($timeout - $i) -PercentComplete $pct
+
+                try {
+                    Write-Verbose "Attempting to set default calendar settings"
+                    $resource | Set-CalendarProcessing -DomainController $dc `
+                                -AllRequestOutOfPolicy:$True -AutomateProcessing AutoAccept `
+                                -BookingWindowInDays 365 -ResourceDelegates $Owner `
+                                -ErrorAction Stop
+                    Write-Verbose "Took $i seconds for the resource to become available."
                     break
+                } catch {
+                    #Write-Warning $_
+                    Start-Sleep 1
                 }
+            }
+            Write-Progress -Activity $activity -Status $status -Completed
+            if ($i -eq $timeout) {
+                Write-Error "Unable to set calendar defaults!"
             }
         } elseif ( $Shared -and !$Calendar ) {
                 # Set the target mailbox's EmailAddresses property to include the PrimarySMTPAddress
