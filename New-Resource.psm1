@@ -206,6 +206,13 @@ function New-Resource {
             return
         }
 
+        if ($OtherMailboxGuid -ne $null) {
+            Write-Verbose "Setting otherMailbox to $OtherMailboxGuid"
+            $null = Set-ADAttribute -DomainController $dc `
+                        -Identity $resource.UserPrincipalName `
+                        -Attribute otherMailbox `
+                        -Value $OtherMailboxGuid.ToString('b')
+        }
 
         $timeout = 60
         $waitingOn = $controllers.Count
