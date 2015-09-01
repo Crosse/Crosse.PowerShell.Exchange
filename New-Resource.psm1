@@ -20,7 +20,8 @@ function New-Resource {
             ConfirmImpact="High")]
 
     param (
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory=$true,
+                ValueFromPipeline=$true)]
             [ValidateNotNullOrEmpty()]
             [string]
             # The name of the new resource as it will appear in the GAL.
