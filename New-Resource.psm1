@@ -154,8 +154,12 @@ function New-Resource {
                 return
             }
         }
+        if ([String]::IsNullOrEmpty($BaseDN)) {
+            $ou = $domain.Name + "/ExchangeObjects"
+        } else {
+            $ou = $BaseDN
+        }
 
-        $ou = $BaseDN
         if  ( $Room ) {
             $ou += "/Resources/Rooms"
         } elseif ( $Equipment ) {
