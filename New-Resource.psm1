@@ -180,28 +180,26 @@ function New-Resource {
             $alias += "_Mailbox"
         }
 
-        $cmd  = "New-Mailbox -DomainController $dc "
-        $cmd += "-OrganizationalUnit `"$ou`" -Name `"$Name`" -Alias `"$alias`" -UserPrincipalName "
-        $cmd += "`"$($alias)@ad.jmu.edu`" -DisplayName `"$DisplayName`""
-        $cmd += "-ManagedFolderMailboxPolicy 'Default Managed Folder Policy' -ManagedFolderMailboxPolicyAllowed:`$true "
-
-        $error.Clear()
+        $newMailboxParams = @{
+            DomainController = $dc
+            Name = $Name
+            Alias = $Alias
+            Displayname = $DisplayName
+            UserPrincipalName = "$($alias)@ad.jmu.edu"
+            OrganizationalUnit = $ou
+            ManagedFolderMailboxPolicy = "Default Managed Folder Policy"
+            ManagedFolderMailboxPolicyAllowed = $true
+        }
 
         if ( $Room ) {
-            $cmd += " -Room"
+            $newMailboxParams["Room"] = $true
         } elseif ( $Equipment ) {
-            $cmd += " -Equipment"
+            $newMailboxParams["Equipment"] = $true
         } elseif ( $Shared ) {
-            $cmd += " -Shared"
+            $newMailboxParams["Shared"] = $true
         }
 
-        Invoke-Expression($cmd)
-
-        if (!([String]::IsNullOrEmpty($error[0]))) {
-            return
-        }
-
-        $resource = Get-Mailbox -DomainController $dc -Identity "$DisplayName"
+        $resource = New-Mailbox -ErrorAction Stop @newMailboxParams
 
         if ( !$resource) {
             Write-Error "Could not find $alias in Active Directory."
