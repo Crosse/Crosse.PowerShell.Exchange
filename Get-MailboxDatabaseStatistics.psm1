@@ -174,10 +174,9 @@ function Get-MailboxDatabaseStatistics {
             }
         }
         $i++
-        $dbInfo
         Write-Progress -Activity "Gathering Database Statistics" -Status "Finished" -Id 1 -Completed
-    }
 
-    END {
+
+        return $dbInfo
     }
 }
