@@ -70,12 +70,12 @@ function Add-ResourceDelegate {
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
-            $SharedMailboxTemplateEmail = (Join-Path $PSScriptRoot "SharedMailboxDelegateTemplateEmail.html"),
+            $ResourceMailboxTemplate = (Join-Path $PSScriptRoot "ResourceMailboxDelegateTemplateEmail.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
             [string]
-            $ResourceMailboxTemplateEmail = (Join-Path $PSScriptRoot "ResourceMailboxDelegateTemplateEmail.html"),
+            $SharedMailboxTemplate = (Join-Path $PSScriptRoot "SharedMailboxDelegateTemplateEmail.html"),
 
             [Parameter(Mandatory=$false)]
             [ValidateNotNullOrEmpty()]
@@ -247,16 +247,16 @@ function Add-ResourceDelegate {
             $Subject = "Information about Exchange resource `"$resource`""
             if ( $resourceType -eq 'SharedMailbox' ) {
                 $Subject += " (Shared Mailbox)"
-                $Template = $SharedMailboxTemplateEmail
+                $Template = $SharedMailboxTemplate
             } elseif ( $resourceType -eq 'UserMailbox' ) {
                 $Subject += " (User Mailbox)"
-                $Template = $SharedMailboxTemplateEmail
+                $Template = $SharedMailboxTemplate
             } elseif ( $resourceType -eq 'EquipmentMailbox' ) {
                 $Subject += " (Equipment Resource)"
-                $Template = $ResourceMailboxTemplateEmail
+                $Template = $ResourceMailboxTemplate
             } elseif ( $resourceType -eq 'RoomMailbox' ) {
                 $Subject += " (Room Resource)"
-                $Template = $ResourceMailboxTemplateEmail
+                $Template = $ResourceMailboxTemplate
             }
 
             $To = (Get-Recipient $objUser.Identity).PrimarySmtpAddress.ToString()
