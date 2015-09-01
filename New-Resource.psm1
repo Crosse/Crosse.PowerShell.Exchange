@@ -149,7 +149,7 @@ function New-Resource {
         if ($Shared) {
             $tempResource = Get-Recipient -Anr $PrimarySMTPAddress -DomainController $dc
             if ($tempResource -ne $null) {
-                Write-Error "The PrimarySmtpAddress already exists:"
+                Write-Error "The PrimarySmtpAddress already exists"
                 $tempResource
                 return
             }
