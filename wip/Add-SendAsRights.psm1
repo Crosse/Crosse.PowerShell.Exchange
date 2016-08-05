@@ -33,7 +33,7 @@ if ($Delegate -eq '' -or $Identity -eq '') {
 }
 
 ##################################
-$DomainController = (gc Env:\LOGONSERVER).Replace('\', '')
+$DomainController = (Get-Content Env:\LOGONSERVER).Replace('\', '')
 if ($DomainController -eq $null) { 
     Write-Warning "Could not determine the local computer's logon server!"
     return
@@ -59,7 +59,7 @@ $sobo = (Get-Mailbox -DomainController $DomainController -Identity $resource).Gr
 if ( !$sobo.Contains((Get-User $Delegate).DistinguishedName) ) {
     $null = $sobo.Add( (Get-User $Delegate).DistinguishedName )
     Write-Host "Current Users with Send rights:"
-    $sobo |  % { $_.Name }
+    $sobo |  Foreach-Object { $_.Name }
 }
 $resource | Set-Mailbox -DomainController $DomainController `
             -GrantSendOnBehalfTo $sobo

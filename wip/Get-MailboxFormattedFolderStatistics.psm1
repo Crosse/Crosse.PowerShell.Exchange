@@ -36,7 +36,7 @@ if ($User -eq $null) {
 }
 
 Get-MailboxFolderStatistics $User.Name | 
-    Select FolderPath, `
+    Select-Object FolderPath, `
     @{Name="Items"; Expression={$_.ItemsInFolder} }, `
     @{Name="FolderSize(KB)"; Expression={ $_.FolderSize.ToKB() } }, `
     @{Name="TotalItems"; Expression={$_.ItemsInFolderAndSubfolders} }, `

@@ -2,5 +2,5 @@ $users = Get-CASMailbox -ResultSize Unlimited -Filter { HasActiveSyncDevicePartn
 
 foreach ($user in $users) { 
     Get-ActiveSyncDeviceStatistics -Mailbox $user -ErrorAction SilentlyContinue 
-} | Select Identity,FirstSyncTime,LastSyncSuccess,LastSyncAttemptTime,Devicetype,DeviceModel,DeviceUserAgent,DevicePhoneNumber
+} | Select-Object Identity,FirstSyncTime,LastSyncSuccess,LastSyncAttemptTime,Devicetype,DeviceModel,DeviceUserAgent,DevicePhoneNumber
 

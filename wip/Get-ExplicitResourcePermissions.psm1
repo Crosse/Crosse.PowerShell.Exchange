@@ -63,30 +63,30 @@ PROCESS {
     }
 
     if ($MailboxPermissions -eq $true) {
-        $perms = Get-MailboxPermission $Identity.ToString() | ? { `
+        $perms = Get-MailboxPermission $Identity.ToString() | Where-Object { `
                 $_.IsInherited -eq $False -and $_.AccessRights -eq "FullAccess" } 
 
         $perms | 
-            Select @{Name="Identity"; Expression={ $_.Identity.Name } }, `
+            Select-Object @{Name="Identity"; Expression={ $_.Identity.Name } }, `
             User, `
             @{Name="Right"; Expression={ $_.AccessRights } }
     }
 
     if ($SendAsPermissions -eq $true) {
-        $perms = Get-ADPermission $Identity.Identity | ? { `
+        $perms = Get-ADPermission $Identity.Identity | Where-Object { `
             $_.Deny -eq $false -and `
             $_.User -notmatch "SELF" -and `
             $_.ExtendedRights -match "Send-As" }
 
         $perms | 
-            Select @{Name="Identity"; Expression={ $_.Identity.Name } }, `
+            Select-Object @{Name="Identity"; Expression={ $_.Identity.Name } }, `
                 User, `
                 @{Name="Right"; Expression={ $_.ExtendedRights } }
     }
 
     if ($SendOnBehalfPermissions -eq $true) {
         $Identity.GrantSendOnBehalfTo |
-            Select @{Name="Identity"; Expression={ $Identity.Name } }, `
+            Select-Object @{Name="Identity"; Expression={ $Identity.Name } }, `
             @{Name="User"; Expression={ $_.Name } }, `
             @{Name="Right"; Expression={ "SendOnBehalf" } }
     }

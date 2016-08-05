@@ -29,7 +29,7 @@ param ( $Start=$(Get-Date).AddDays(-1),
         $MessageSubject=$null,
         $MessageId=$null) { }
 
-$hubs = Get-ExchangeServer | ? { $_.ServerRole -match 'Hub' }
+$hubs = Get-ExchangeServer | Where-Object { $_.ServerRole -match 'Hub' }
 
 $cmd = "Invoke-Command { `$hubs | Get-MessageTrackingLog -ResultSize Unlimited -Start `"$Start`""
 

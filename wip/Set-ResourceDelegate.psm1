@@ -39,7 +39,7 @@ $Bcc                = "wrightst@jmu.edu, millerca@jmu.edu, najdziav@jmu.edu, eck
 $Fqdn               = "exchange.jmu.edu"
 ##################################
 $cwd                = [System.IO.Path]::GetDirectoryName(($MyInvocation.MyCommand).Definition)
-$DomainController   = (gc Env:\LOGONSERVER).Replace('\', '')
+$DomainController   = (Get-Content Env:\LOGONSERVER).Replace('\', '')
 
 if ($DomainController -eq $null) { 
     Write-Warning "Could not determine the local computer's logon server!"

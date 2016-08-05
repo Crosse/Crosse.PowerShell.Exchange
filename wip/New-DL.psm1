@@ -29,7 +29,7 @@ param ( [string]$DisplayName,
 $OU     = "ad.jmu.edu/ExchangeObjects/DistributionGroups"
 
 ##################################
-$DomainController = (gc Env:\LOGONSERVER).Replace('\', '')
+$DomainController = (Get-Content Env:\LOGONSERVER).Replace('\', '')
 if ($DomainController -eq $null) { 
     Write-Warning "Could not determine the local computer's logon server!"
     return

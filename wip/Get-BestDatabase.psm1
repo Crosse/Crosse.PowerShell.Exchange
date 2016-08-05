@@ -34,14 +34,14 @@ if ($srv -eq $null) {
     return
 }
 
-$DomainController = (gc Env:\LOGONSERVER).Replace('\', '')
+$DomainController = (Get-Content Env:\LOGONSERVER).Replace('\', '')
 if ($DomainController -eq $null) { 
     Write-Warning "Could not determine the local computer's logon server!"
     return
 }
 
 $databases = Get-MailboxDatabase -Server $srv -Status | 
-Where { $_.Mounted -eq $True -and $_.Name -match "^(SG|DB)" }
+    Where-Object { $_.Mounted -eq $True -and $_.Name -match "^(SG|DB)" }
 if ($databases -eq $null) {
     Write-Error "Could not enumerate databases on server $Server"
     return
