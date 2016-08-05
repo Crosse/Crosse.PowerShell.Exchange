@@ -26,8 +26,6 @@
 
 param ([string]$Server="localhost", [switch]$Single=$true)
 
-##################################
-
 $srv = Get-ExchangeServer $Server
 if ($srv -eq $null) {
     Write-Error "Could not find Exchange Server $Server"

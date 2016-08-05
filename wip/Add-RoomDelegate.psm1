@@ -39,7 +39,6 @@ function Add-RoomDelegate {
           );
 
 
-##################################
     $DomainController = (Get-Content Env:\LOGONSERVER).Replace('\', '')
         if ($DomainController -eq $null) { 
             Write-Warning "Could not determine the local computer's logon server!"

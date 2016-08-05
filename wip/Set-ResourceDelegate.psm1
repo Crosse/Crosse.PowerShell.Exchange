@@ -37,7 +37,7 @@ $SmtpServer         = "it-exhub.ad.jmu.edu"
 $From               = "it-exmaint@jmu.edu"
 $Bcc                = "wrightst@jmu.edu, millerca@jmu.edu, najdziav@jmu.edu, eckardsl@jmu.edu"
 $Fqdn               = "exchange.jmu.edu"
-##################################
+
 $cwd                = [System.IO.Path]::GetDirectoryName(($MyInvocation.MyCommand).Definition)
 $DomainController   = (Get-Content Env:\LOGONSERVER).Replace('\', '')
 
