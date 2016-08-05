@@ -17,9 +17,7 @@
 ################################################################################
 
 function Get-ExchangeReplicationInfo {
-    [CmdletBinding(SupportsShouldProcess=$true,
-            ConfirmImpact="High")]
-
+    [CmdletBinding()]
     param (
             [Parameter(Mandatory=$false)]
             [int]

@@ -17,8 +17,7 @@
 ################################################################################
 
 function Get-MailboxDatabaseStatistics {
-    [CmdletBinding(SupportsShouldProcess=$true,
-            ConfirmImpact="High")]
+    [CmdletBinding()]
     param (
             [Parameter(Mandatory=$false,
                 ValueFromPipeline=$true)]

@@ -25,9 +25,7 @@
 ################################################################################
 
 function Expand-DistributionGroup {
-    [CmdletBinding(SupportsShouldProcess=$true,
-        ConfirmImpact="High")]
-
+    [CmdletBinding()]
     param (
             [Parameter(Mandatory=$true,
                 ValueFromPipeline=$true)]

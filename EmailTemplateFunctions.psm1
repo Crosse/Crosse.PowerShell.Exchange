@@ -53,8 +53,7 @@ function New-EmailDetailsObject {
 }
 
 function Send-ProvisioningNotification {
-    [CmdletBinding(SupportsShouldProcess=$true,
-            ConfirmImpact="High")]
+    [CmdletBinding()]
     param (
             [Parameter(Mandatory=$true,
                 ValueFromPipeline=$true)]
