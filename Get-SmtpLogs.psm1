@@ -152,7 +152,7 @@ function Get-SmtpLogs {
     }
 
     Write-Verbose "Found $($logfiles.Count) total log files."
-    $fromFiles += ($logfiles | % { $_.FullName }) -join ",`n    "
+    $fromFiles += ($logfiles | Foreach-Object { $_.FullName }) -join ",`n    "
 
     if ([String]::IsNullOrEmpty($ClientIpAddress) -eq $false) {
         $clientAddr = "ClientIpAddress = '$ClientIpAddress' AND"
@@ -229,9 +229,9 @@ ORDER BY
                 $hash[$id].Conversation += $convo
             }
             if ($ResultSize -eq $null) {
-                $hash.Values | Sort DateTime,SessionId
+                $hash.Values | Sort-Object DateTime,SessionId
             } else {
-                $hash.Values | Sort DateTime,SessionId | Select -First $ResultSize
+                $hash.Values | Sort-Object DateTime,SessionId | Select-Object -First $ResultSize
             }
         }
     }

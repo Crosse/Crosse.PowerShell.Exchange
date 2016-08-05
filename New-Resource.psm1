@@ -98,7 +98,7 @@ function New-Resource {
         $Verbose = ($PSBoundParameters["Verbose"] -eq $null -or $PSBoundParameters["Verbose"].ToBool())
 
         $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-        $controllers = @($domain.DomainControllers | % { $_.Name.ToLower() })
+        $controllers = @($domain.DomainControllers | Foreach-Object { $_.Name.ToLower() })
         $controllersCount = $controllers.Count
         Write-Verbose "Found $controllersCount domain controllers."
 

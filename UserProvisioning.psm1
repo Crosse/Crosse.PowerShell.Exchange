@@ -295,7 +295,7 @@ function Add-ProvisionedMailbox {
         $savedAttributes["CustomAttribute15"] = "LastProvisioned: $(Get-Date -Format u)"
 
         # Print out everything we know about the user so far (-Verbose)
-        foreach ($key in ($savedAttributes.Keys | Sort)) {
+        foreach ($key in ($savedAttributes.Keys | Sort-Object)) {
             Write-Verbose "$($key):`t$($savedAttributes[$key])"
         }
 

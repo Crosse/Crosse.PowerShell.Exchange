@@ -81,7 +81,7 @@ function Connect-ToLiveAtEdu {
 }
 
 function Disconnect-LiveAtEdu {
-    Get-PSSession | ? { $_.Name -match 'Live@edu' } | Remove-PSSession
+    Get-PSSession | Where-Object { $_.Name -match 'Live@edu' } | Remove-PSSession
 
     if ((Test-Path Function:\Remove-ShellType) -eq $true) {
         Remove-ShellType "Live@edu"

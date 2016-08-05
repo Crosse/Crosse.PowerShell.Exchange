@@ -145,7 +145,7 @@ function Get-ActiveSyncStatistics {
     }
 
     Write-Verbose "Found $($logfiles.Count) total log files."
-    $fromFiles += ($logfiles | % { $_.FullName }) -join ",`n    "
+    $fromFiles += ($logfiles | Foreach-Object { $_.FullName }) -join ",`n    "
 
     if ([String]::IsNullOrEmpty($User) -eq $false) {
         $whereUser = "`n    AND UserName  = '$User'"
